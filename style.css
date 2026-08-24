@@ -226,3 +226,17 @@ body.tb-overlay-open {
     margin:0;
   }
 }
+
+
+/* v0.17 */
+@media(max-width:650px){
+  #tb_overlay_header .tb-overlay-actions {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    width:min(210px,48vw);
+  }
+  #tb_overlay_header .tb-overlay-actions .menu_button {
+    min-width:0;
+    white-space:nowrap;
+  }
+}

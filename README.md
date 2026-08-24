@@ -1,4 +1,4 @@
-# 酒馆战斗 · SillyTavern 扩展 v0.15
+# 酒馆战斗 · SillyTavern 扩展 v0.17
 
 这是把独立战斗 Demo v0.14 接入 SillyTavern 的第一版闭环。
 
@@ -86,3 +86,30 @@ manifest 当前声明 `minimum_client_version: 1.18.0`。
 - 战斗结束续写仍保留 `generateQuietPrompt`，因为那一步本来就需要当前角色卡、世界书、聊天和小说预设。
 - AI 数据填写现在附带完整的现有角色 / 技能 / 装备 / 天赋 / 状态 ID 索引。
 - 正常剧情触发协议只发送角色及其已装备技能/装备/天赋，避免未来数据库变大后每次剧情请求都发送几百条无关 ID。
+
+
+## v0.17：AI 新建 / 修改分离 + 剧情 / 激活世界书参考
+
+数据编辑器的 AI 操作拆成两类：
+
+- `✨ AI新建`：不把当前浏览对象当模板；要求生成新的唯一 ID。
+- `🪄 AI修改当前`：当前对象作为修改基底；默认保持原 ID，并尽量保留未要求删除的复杂规则。
+
+AI 面板新增：
+
+- `附加最近剧情与当前角色参考`
+- `附加当前激活世界书`
+- `补充要求`
+
+世界书不是把所有 Lorebook 全量塞给模型，而是调用 SillyTavern 当前的 World Info 扫描逻辑，
+对当前聊天执行 dry-run，只提取当前会被激活的条目内容。
+
+数据生成依旧优先使用 `generateRaw()` 和独立结构化 system prompt：
+剧情与世界书只作为参考资料，不会把数据 AI 变回小说续写器。
+
+同时补齐 AI 目标结构：
+- 角色：statusResist / immunities
+- 技能：aiWeight / coreEffects / rules
+- 装备：statusResist / rules
+- 天赋：rules
+- 场景：blocksMovement / blocksAttack

@@ -7,7 +7,7 @@
   "js": "index.js",
   "css": "style.css",
   "author": "Tavern Battle Prototype",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "minimum_client_version": "1.18.0",
   "auto_update": false,
   "hooks": {

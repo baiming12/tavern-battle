@@ -19,6 +19,14 @@
     aiKind:null,
     aiSchema:null,
     aiTargetApply:null,
+    aiMode:'modify',
+    aiCurrent:null,
+    aiPlain:false,
+    aiHints:null,
+    aiReturnTab:'scene',
+    aiIncludeStory:true,
+    aiIncludeWorldInfo:true,
+    aiExtraRequirements:'',
     lang:'zh'
   };
 
@@ -485,7 +493,8 @@
           <div class="editor-actions">
             <button id="applySceneBtn">保存并开始此场景</button>
             <button id="reloadSceneBtn" class="secondary">放弃修改</button>
-            <button id="sceneAIBtn" class="secondary">AI生成整张场景</button>
+            <button id="sceneAINewBtn" class="secondary">✨ AI新建场景</button>
+            <button id="sceneAIModifyBtn" class="secondary">🪄 AI修改当前场景</button>
           </div>
           <p class="editor-warning">坐标在文件里是0开始；这里直接点格子即可。重复使用同一个图鉴角色时，会自动生成独立实例ID。</p>
           <div id="cellInfo" class="json-preview">${E.selectedCell?esc(JSON.stringify(E.selectedCell,null,2)):'点击格子查看/编辑。'}</div>
@@ -548,8 +557,15 @@
       renderScene(body);
     });
     body.querySelector('#reloadSceneBtn').addEventListener('click',()=>{E.scene=api.getScene(); renderScene(body);});
-    body.querySelector('#sceneAIBtn').addEventListener('click',()=>{
-      openAI('scene',E.scene,sceneSchema(),json=>{E.scene=json; E.tab='scene'; render();});
+    body.querySelector('#sceneAINewBtn').addEventListener('click',()=>{
+      openAI('scene',null,sceneSchema(),json=>{E.scene=json; E.tab='scene'; render();},false,{
+        mode:'create',returnTab:'scene',hints:{boardSize:E.scene?.boardSize||9}
+      });
+    });
+    body.querySelector('#sceneAIModifyBtn').addEventListener('click',()=>{
+      openAI('scene',E.scene,sceneSchema(),json=>{E.scene=json; E.tab='scene'; render();},false,{
+        mode:'modify',returnTab:'scene'
+      });
     });
 
     renderSceneBoard(body.querySelector('#sceneBoard'),body);
@@ -641,7 +657,8 @@
           <div class="editor-actions">
             <button id="newActorBtn">新建角色</button>
             <button id="deleteActorBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button>
-            <button id="actorAIBtn" class="secondary">AI填写角色</button>
+            <button id="actorAINewBtn" class="secondary">✨ AI新建角色</button>
+            <button id="actorAIModifyBtn" class="secondary">🪄 AI修改当前</button>
           </div>
         </div>
         <div class="editor-panel">
@@ -664,10 +681,18 @@
       if(!data.id) return alert('必须填写ID');
       api.updateLibrary(kind,data.id,data,true); E.selectedId=data.id; renderCodex(body);
     });
-    body.querySelector('#actorAIBtn').addEventListener('click',()=>{
-      openAI('actor',readActorForm(body,kind),actorSchema(),json=>{
+    body.querySelector('#actorAINewBtn').addEventListener('click',()=>{
+      openAI('actor',null,actorSchema(),json=>{
+        json.team=kind;
         api.updateLibrary(kind,json.id,json,true); E.selectedId=json.id; E.tab='codex'; render();
-      });
+      },false,{mode:'create',returnTab:'codex',hints:{team:kind}});
+    });
+    body.querySelector('#actorAIModifyBtn').addEventListener('click',()=>{
+      const current=readActorForm(body,kind);
+      openAI('actor',current,actorSchema(),json=>{
+        json.team=kind;
+        api.updateLibrary(kind,json.id,json,true); E.selectedId=json.id; E.tab='codex'; render();
+      },false,{mode:'modify',returnTab:'codex',hints:{team:kind}});
     });
   }
 
@@ -989,7 +1014,8 @@
           <div class="editor-actions">
             <button id="newLibBtn">新建</button>
             <button id="deleteLibBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button>
-            <button id="libAIBtn" class="secondary">AI填写</button>
+            <button id="libAINewBtn" class="secondary">✨ AI新建</button>
+            <button id="libAIModifyBtn" class="secondary">🪄 AI修改当前</button>
           </div>
         </div>
         <div class="editor-panel">
@@ -1010,11 +1036,16 @@
       if(!data.id)return alert('必须填写ID');
       api.updateLibrary(kind,data.id,data,true); E.selectedId=data.id; renderLibraryEditor(kind);
     });
-    body.querySelector('#libAIBtn').addEventListener('click',()=>{
+    body.querySelector('#libAINewBtn').addEventListener('click',()=>{
+      openAI(kind,null,kind==='skill'?skillSchema():equipSchema(),json=>{
+        api.updateLibrary(kind,json.id,json,true);E.selectedId=json.id;E.tab=kind;render();
+      },false,{mode:'create',returnTab:kind});
+    });
+    body.querySelector('#libAIModifyBtn').addEventListener('click',()=>{
       const data=kind==='skill'?readSkillForm(body):readEquipForm(body);
       openAI(kind,data,kind==='skill'?skillSchema():equipSchema(),json=>{
         api.updateLibrary(kind,json.id,json,true);E.selectedId=json.id;E.tab=kind;render();
-      });
+      },false,{mode:'modify',returnTab:kind});
     });
   }
 
@@ -1073,7 +1104,7 @@
     body.innerHTML=`<div class="editor-grid">
       <div class="editor-panel"><h3>Buff / Debuff 状态库</h3>
         <div class="editor-list">${ids.map(id=>`<button class="editor-chip ${id===E.selectedId?'active':''}" data-id="${esc(id)}">${esc(b[id].name||id)}</button>`).join('')}</div>
-        <div class="editor-actions"><button id="newStatusBtn">新建状态</button><button id="deleteStatusBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button><button id="statusAIBtn" class="secondary">AI填写</button></div>
+        <div class="editor-actions"><button id="newStatusBtn">新建状态</button><button id="deleteStatusBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button><button id="statusAINewBtn" class="secondary">✨ AI新建</button><button id="statusAIModifyBtn" class="secondary">🪄 AI修改当前</button></div>
         <p class="editor-warning">状态可被技能、装备、天赋的通用 Effect 使用 <code>apply_status</code> 施加。状态自身也能带规则，例如“行动结束时流血掉血”。</p>
       </div>
       <div class="editor-panel"><h3>状态数据</h3><div class="form-grid">
@@ -1107,7 +1138,12 @@
     body.querySelector('#newStatusBtn').addEventListener('click',()=>{E.selectedId=null;renderStatus(body);});
     body.querySelector('#deleteStatusBtn').addEventListener('click',()=>{if(E.selectedId&&confirm(`删除 ${E.selectedId}？`)){api.deleteLibrary('status',E.selectedId,true);E.selectedId=null;renderStatus(body);}});
     body.querySelector('#saveStatusBtn').addEventListener('click',()=>{const data=readStatus(body);if(!data.id)return alert('必须填写ID');api.updateLibrary('status',data.id,data,true);E.selectedId=data.id;renderStatus(body);});
-    body.querySelector('#statusAIBtn').addEventListener('click',()=>{openAI('status',readStatus(body),statusSchema(),json=>{api.updateLibrary('status',json.id,json,true);E.selectedId=json.id;E.tab='status';render();});});
+    body.querySelector('#statusAINewBtn').addEventListener('click',()=>{
+      openAI('status',null,statusSchema(),json=>{api.updateLibrary('status',json.id,json,true);E.selectedId=json.id;E.tab='status';render();},false,{mode:'create',returnTab:'status'});
+    });
+    body.querySelector('#statusAIModifyBtn').addEventListener('click',()=>{
+      openAI('status',readStatus(body),statusSchema(),json=>{api.updateLibrary('status',json.id,json,true);E.selectedId=json.id;E.tab='status';render();},false,{mode:'modify',returnTab:'status'});
+    });
   }
   function newStatus(){return{id:'',name:'',polarity:'buff',icon:'',tags:[],controlTags:[],conflicts:[],applyChance:100,description:'',maxStacks:1,stackMode:'refresh',dispellable:true,duration:{type:'turns',turns:2},modifiers:[],rules:[]};}
   function readStatus(body){
@@ -1138,7 +1174,8 @@
           <div class="editor-actions">
             <button id="newTalentBtn">新建天赋</button>
             <button id="deleteTalentBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button>
-            <button id="talentAIBtn" class="secondary">AI填写</button>
+            <button id="talentAINewBtn" class="secondary">✨ AI新建</button>
+            <button id="talentAIModifyBtn" class="secondary">🪄 AI修改当前</button>
           </div>
           <hr>
           <h3>奖励 Roll · 3选1</h3>
@@ -1188,8 +1225,11 @@
       const data=readTalentForm(body);if(!data.id)return alert('必须填写ID');
       api.updateLibrary('talent',data.id,data,true);E.selectedId=data.id;renderTalent(body);
     });
-    body.querySelector('#talentAIBtn').addEventListener('click',()=>{
-      openAI('talent',readTalentForm(body),talentSchema(),json=>{api.updateLibrary('talent',json.id,json,true);E.selectedId=json.id;E.tab='talent';render();});
+    body.querySelector('#talentAINewBtn').addEventListener('click',()=>{
+      openAI('talent',null,talentSchema(),json=>{api.updateLibrary('talent',json.id,json,true);E.selectedId=json.id;E.tab='talent';render();},false,{mode:'create',returnTab:'talent'});
+    });
+    body.querySelector('#talentAIModifyBtn').addEventListener('click',()=>{
+      openAI('talent',readTalentForm(body),talentSchema(),json=>{api.updateLibrary('talent',json.id,json,true);E.selectedId=json.id;E.tab='talent';render();},false,{mode:'modify',returnTab:'talent'});
     });
     body.querySelector('#rollTalentBtn').addEventListener('click',()=>{
       const count=Math.max(1,Math.min(5,num(body.querySelector('#talentCount').value,3)));
@@ -1241,36 +1281,153 @@
       catch(e){alert(`解析失败：${e.message}`);}
     });
     body.querySelector('#triggerAIBtn').addEventListener('click',()=>{
-      openAI('battle_trigger',{format:'simple',current:body.querySelector('#triggerText').value},triggerSchema(),jsonOrText=>{
+      openAI('battle_trigger',null,triggerSchema(),jsonOrText=>{
         body.querySelector('#triggerText').value=typeof jsonOrText==='string'?jsonOrText:(jsonOrText.trigger||'');
-      },true);
+      },true,{mode:'create',returnTab:'trigger',hints:{currentTrigger:body.querySelector('#triggerText').value}});
     });
   }
 
-  // ---------- AI填写 ----------
-  function openAI(kind,current,schema,applyFn,plainText=false){
-    E.aiKind=kind;E.aiSchema=schema;E.aiTargetApply=applyFn;
-    E.aiCurrent=current;E.aiPlain=plainText;E.tab='ai';render();
+  // ---------- AI新建 / AI修改 ----------
+  function openAI(kind,current,schema,applyFn,plainText=false,options={}){
+    E.aiKind=kind;
+    E.aiSchema=schema;
+    E.aiTargetApply=applyFn;
+    E.aiCurrent=current;
+    E.aiPlain=plainText;
+    E.aiMode=options.mode||'modify';
+    E.aiHints=options.hints||null;
+    E.aiReturnTab=options.returnTab||E.tab||'scene';
+    E.aiIncludeStory=options.includeStory!==false;
+    E.aiIncludeWorldInfo=options.includeWorldInfo!==false;
+    E.aiExtraRequirements='';
+    E.tab='ai';
+    render();
+  }
+
+  function aiKindLabel(kind){
+    return ({
+      actor:'角色',skill:'技能',equipment:'装备',status:'状态',
+      talent:'天赋',scene:'场景',battle_trigger:'战斗触发'
+    })[kind]||kind;
+  }
+
+  function aiModeLabel(mode){
+    return mode==='create'?'AI 新建':'AI 修改当前';
+  }
+
+  function idExistsForAI(kind,id){
+    if(!id)return false;
+    const c=collection();
+    if(kind==='actor'){
+      return !!(c.allies?.[id]||c.neutrals?.[id]||c.enemies?.[id]);
+    }
+    return !!bucket(kind)?.[id];
+  }
+
+  function buildAIPrompt(kind,current,schema,{mode='modify',extraRequirements='',hints=null}={}){
+    const lines=[
+      `你正在为一个 SillyTavern 回合制战斗插件${mode==='create'?'创建全新数据':'修改现有数据'}。`,
+      `任务类型：${kind}`,
+      `操作模式：${mode==='create'?'CREATE / 新建':'MODIFY / 修改当前'}`,
+      '',
+      '硬性要求：',
+      '1. 战斗数值必须内部一致，不要为了预设剧情结果故意加强或削弱。',
+      '2. 角色的技能 / 装备 / 天赋引用，以及技能与规则的状态引用，都使用已有 ID。',
+      '3. 只输出目标结构要求的数据，不要输出解释性正文。',
+      `4. ${kind==='battle_trigger'?'返回简洁的 <BATTLE>...</BATTLE> 文本。':'只返回一个合法 JSON 对象。'}`
+    ];
+
+    if(mode==='create'){
+      lines.push(
+        '5. 这是“新建”任务：不要复制当前正在浏览的对象，不要沿用它的 ID。',
+        '6. 必须生成一个语义清晰、不会与已有数据库重复的新 ID。'
+      );
+    }else{
+      lines.push(
+        '5. 这是“修改当前”任务：必须以当前数据为基底修改。',
+        '6. 除非补充要求明确要求改 ID，否则保持当前 id 不变；未要求改动的复杂规则应尽量保留。'
+      );
+    }
+
+    if(hints && Object.keys(hints).length){
+      lines.push('', '固定提示 / 环境约束：', JSON.stringify(hints,null,2));
+    }
+
+    if(mode==='modify'){
+      lines.push('', '当前数据：', JSON.stringify(current||{},null,2));
+    }
+
+    lines.push('', '目标结构：', JSON.stringify(schema||{},null,2));
+
+    const extra=String(extraRequirements||'').trim();
+    lines.push('', '补充要求：', extra||'（无额外要求，请根据当前剧情、世界设定与战斗数据库合理处理。）');
+
+    return lines.join('\n');
   }
 
   function renderAI(body){
     const kind=E.aiKind||'actor';
-    const promptText=buildAIPrompt(kind,E.aiCurrent||{},E.aiSchema||{});
+    const mode=E.aiMode||'modify';
+    const refreshPrompt=()=>{
+      const extra=body.querySelector('#aiExtraRequirements')?.value??E.aiExtraRequirements??'';
+      E.aiExtraRequirements=extra;
+      const prompt=buildAIPrompt(kind,E.aiCurrent||{},E.aiSchema||{},{
+        mode,
+        extraRequirements:extra,
+        hints:E.aiHints
+      });
+      const box=body.querySelector('#aiPrompt');
+      if(box)box.value=prompt;
+    };
+
     body.innerHTML=`
       <div class="editor-grid">
         <div class="editor-panel">
-          <h3>AI 自动填写</h3>
-          <div id="aiStatus" class="ai-status">独立Demo尚未连接酒馆生成接口。</div>
-          <textarea id="aiPrompt" class="trigger-box">${esc(promptText)}</textarea>
-          <div class="editor-actions">
-            <button id="callAIButton">调用 AI Provider</button>
-            <button id="copyPromptBtn" class="secondary">复制提示词</button>
+          <div class="ai-title-row">
+            <div>
+              <h3>${aiModeLabel(mode)} · ${aiKindLabel(kind)}</h3>
+              <div class="muted">${mode==='create'?'生成独立的新对象，不把当前对象当模板。':'保留当前对象作为基底，再按要求修改。'}</div>
+            </div>
+            <span class="ai-mode-badge ${mode}">${mode==='create'?'新建':'修改'}</span>
           </div>
-          <p class="editor-warning">接进 SillyTavern 后，插件会提供 <code>window.TavernBattleAIProvider.generate()</code>，这里的“调用”就会直接使用酒馆当前模型。独立Demo可以先复制提示词去模型生成。</p>
+
+          <div id="aiStatus" class="ai-status">已连接 SillyTavern 时，会使用当前连接模型进行隔离的数据生成。</div>
+
+          <div class="ai-context-options">
+            <label class="checkbox-label-local">
+              <input id="aiIncludeStory" type="checkbox" ${E.aiIncludeStory?'checked':''}>
+              <span>附加最近剧情与当前角色参考</span>
+            </label>
+            <label class="checkbox-label-local">
+              <input id="aiIncludeWorldInfo" type="checkbox" ${E.aiIncludeWorldInfo?'checked':''}>
+              <span>附加当前激活世界书</span>
+            </label>
+          </div>
+
+          <label class="form-field full ai-extra-field">
+            补充要求
+            <textarea id="aiExtraRequirements" placeholder="例如：设计一把洛家筑基期常用的水属性长剑，偏集气和闪避，强度中等。">${esc(E.aiExtraRequirements||'')}</textarea>
+          </label>
+
+          <details class="ai-prompt-details">
+            <summary>查看 / 手动编辑实际数据任务提示词</summary>
+            <textarea id="aiPrompt" class="trigger-box"></textarea>
+          </details>
+
+          <div class="editor-actions">
+            <button id="callAIButton">${mode==='create'?'✨ 调用 AI 新建':'🪄 调用 AI 修改'}</button>
+            <button id="copyPromptBtn" class="secondary">复制任务提示词</button>
+          </div>
+
+          <p class="editor-warning">
+            “最近剧情 / 当前激活世界书”只作为参考资料附加给数据生成；数据 AI 仍使用独立 system prompt，
+            不会要求模型继续写小说。世界书关闭时不会发送世界书内容。
+          </p>
         </div>
+
         <div class="editor-panel">
-          <h3>AI返回结果</h3>
-          <textarea id="aiResult" class="trigger-box" placeholder="${E.aiPlain?'粘贴 <BATTLE>...</BATTLE>':'粘贴JSON'}"></textarea>
+          <h3>AI 返回结果</h3>
+          <textarea id="aiResult" class="trigger-box" placeholder="${E.aiPlain?'等待 <BATTLE>...</BATTLE>':'等待 JSON'}"></textarea>
           <div class="editor-actions">
             <button id="applyAIResultBtn">应用结果</button>
             <button id="backAITab" class="secondary">返回</button>
@@ -1278,69 +1435,146 @@
         </div>
       </div>`;
 
+    refreshPrompt();
+
+    body.querySelector('#aiExtraRequirements').addEventListener('input',refreshPrompt);
+    body.querySelector('#aiIncludeStory').addEventListener('change',e=>E.aiIncludeStory=!!e.target.checked);
+    body.querySelector('#aiIncludeWorldInfo').addEventListener('change',e=>E.aiIncludeWorldInfo=!!e.target.checked);
+
     body.querySelector('#copyPromptBtn').addEventListener('click',async()=>{
       const t=body.querySelector('#aiPrompt').value;
-      try{await navigator.clipboard.writeText(t);body.querySelector('#aiStatus').textContent='提示词已复制';}
+      try{await navigator.clipboard.writeText(t);body.querySelector('#aiStatus').textContent='任务提示词已复制。';}
       catch{prompt('复制：',t);}
     });
+
     body.querySelector('#callAIButton').addEventListener('click',async()=>{
       const provider=window.TavernBattleAIProvider;
       if(!provider?.generate){
-        body.querySelector('#aiStatus').textContent='未连接酒馆 AI Provider，请先复制提示词或粘贴AI结果。';
+        body.querySelector('#aiStatus').textContent='未连接酒馆 AI Provider，请复制提示词或手动粘贴 AI 结果。';
         return;
       }
-      const btn=body.querySelector('#callAIButton');btn.disabled=true;
-      body.querySelector('#aiStatus').textContent='正在请求当前酒馆模型……';
+
+      const btn=body.querySelector('#callAIButton');
+      btn.disabled=true;
+      const contexts=[
+        E.aiIncludeStory?'最近剧情':'不含剧情',
+        E.aiIncludeWorldInfo?'激活世界书':'不含世界书'
+      ].join(' + ');
+      body.querySelector('#aiStatus').textContent=`正在请求当前模型（${contexts}）……`;
+
       try{
-        const result=await provider.generate({kind,prompt:body.querySelector('#aiPrompt').value,schema:E.aiSchema});
+        E.aiExtraRequirements=body.querySelector('#aiExtraRequirements').value;
+        const result=await provider.generate({
+          kind,
+          operation:mode,
+          prompt:body.querySelector('#aiPrompt').value,
+          schema:E.aiSchema,
+          current:mode==='modify'?E.aiCurrent:null,
+          hints:E.aiHints,
+          includeStory:E.aiIncludeStory,
+          includeWorldInfo:E.aiIncludeWorldInfo,
+          extraRequirements:E.aiExtraRequirements,
+          plainText:E.aiPlain
+        });
         body.querySelector('#aiResult').value=typeof result==='string'?result:JSON.stringify(result,null,2);
-        body.querySelector('#aiStatus').textContent='AI填写完成，请检查后应用。';
-      }catch(err){body.querySelector('#aiStatus').textContent=`AI请求失败：${err.message}`;}
-      finally{btn.disabled=false;}
+        body.querySelector('#aiStatus').textContent=`AI ${mode==='create'?'新建':'修改'}完成，请检查后应用。`;
+      }catch(err){
+        body.querySelector('#aiStatus').textContent=`AI 请求失败：${err.message}`;
+      }finally{
+        btn.disabled=false;
+      }
     });
+
     body.querySelector('#applyAIResultBtn').addEventListener('click',()=>{
       try{
         const raw=body.querySelector('#aiResult').value.trim();
         const result=E.aiPlain?raw:JSON.parse(raw);
         if(!E.aiTargetApply)throw new Error('没有目标编辑器');
+
+        if(mode==='create' && !E.aiPlain && result?.id && idExistsForAI(kind,result.id)){
+          throw new Error(`新建失败：ID「${result.id}」已经存在，请让 AI 生成新的唯一 ID。`);
+        }
+        if(mode==='modify' && !E.aiPlain && E.aiCurrent?.id && result?.id && result.id!==E.aiCurrent.id){
+          const ok=confirm(`AI 将 ID 从「${E.aiCurrent.id}」改成「${result.id}」。这可能使已有引用失效，仍要应用吗？`);
+          if(!ok)return;
+        }
+
         E.aiTargetApply(result);
-      }catch(err){alert(`应用失败：${err.message}`);}
+      }catch(err){
+        alert(`应用失败：${err.message}`);
+      }
     });
-    body.querySelector('#backAITab').addEventListener('click',()=>{E.tab='scene';render();});
+
+    body.querySelector('#backAITab').addEventListener('click',()=>{
+      E.tab=E.aiReturnTab||'scene';
+      render();
+    });
   }
 
-  function buildAIPrompt(kind,current,schema){
-    return `你正在为一个SillyTavern回合制战斗插件填写数据。
-任务类型：${kind}
-
-要求：
-1. 只根据当前世界观/剧情合理补全，不要为了剧情结果故意加强或削弱。
-2. 数值必须内部一致，技能与装备引用使用ID。
-3. 不要添加schema之外的解释性文字。
-4. ${kind==='battle_trigger'?'返回简洁的 <BATTLE>...</BATTLE> 文本。':'只返回一个合法JSON对象。'}
-
-当前数据：
-${JSON.stringify(current,null,2)}
-
-目标结构：
-${JSON.stringify(schema,null,2)}`;
-  }
-
-  // ---------- schema示例 ----------
-  function actorSchema(){return{id:'enemy_bandit',name:'山贼',short:'贼',team:'enemy',maxHp:900,maxQi:250,attack:220,defense:150,crit:5,dodge:5,accuracy:0,qiSpeed:400,move:4,skills:['basic'],equipment:[],talents:[]};}
-  function skillSchema(){return{
-    id:'skill_id',name:'技能名',kind:'attack',castMask:{shape:'diamond',radius:2,includeOrigin:false},effectMask:{shape:'single',radius:0},multiplier:1.2,
-    coreEffects:[
-      {type:'teleport_behind',target:'enemies',requiresHit:false},
-      {type:'damage',target:'enemies',multiplier:1.2,hitCheck:true,canCrit:true,affectsObstacles:true},
-      {type:'apply_status',target:'enemies',statusId:'bleeding',stacks:1,chance:100,requiresHit:true},
-      {type:'lifesteal',value:20}
-    ],qiCost:30,cooldown:2,hitMod:0,canMoveAfterAction:false,description:'示例：闪到目标背后攻击并吸血'
+  // ---------- schema示例 ----------  // ---------- schema示例 ----------
+  function actorSchema(){return{
+    id:'enemy_bandit',name:'山贼',short:'贼',team:'enemy',
+    maxHp:900,maxQi:250,attack:220,defense:150,crit:5,dodge:5,accuracy:0,
+    qiSpeed:400,move:4,statusResist:0,immunities:[],
+    skills:['basic'],equipment:[],talents:[]
   };}
 
-  function equipSchema(){return{id:'equip_id',name:'装备名',slot:'weapon',description:'',modifiers:{attack:20,defense:0,maxHp:0,maxQi:0,qiSpeed:0,move:0,crit:0,dodge:0,accuracy:0}};}
-  function statusSchema(){return{id:'status_id',name:'状态名',polarity:'debuff',icon:'🩸',tags:['physical'],controlTags:[],conflicts:[],applyChance:100,description:'',maxStacks:3,stackMode:'add_refresh',dispellable:true,duration:{type:'turns',turns:3},modifiers:[{stat:'defense',mode:'percent',value:-10,perStack:true}],threshold:{stacks:3,consume:'all',effects:[{type:'deal_damage',target:'self',value:100}]},rules:[{id:'tick',conditions:[{event:'turn_end'}],effects:[{type:'deal_damage',target:'self',value:20,perStack:true},{type:'gain_gauge',target:'attacker',value:5}],triggerScope:'per_event'}]};}
-  function talentSchema(){return{id:'talent_id',name:'天赋名',rarity:'uncommon',type:'triggered',weight:70,triggerScope:'once_per_action',description:'当……时，触发……，维持……回合',conditions:[{event:'attack_hit',subject:'self',field:'hit',op:'==',value:true}],effects:[{type:'modify_stat',target:'self',stat:'attack',mode:'percent',value:10}],duration:{type:'turns',turns:2},cooldown:0};}
-  function sceneSchema(){return{schema:'tavern-battle-scene',version:1,id:'scene_id',name:'场景名',boardSize:9,placements:[{team:'ally',ref:'hero',x:1,y:7,facing:'N'},{team:'enemy',ref:'enemy',instanceId:'enemy_1',x:6,y:2,facing:'S'}],obstacles:[{id:'rock_1',name:'巨石',x:4,y:4,maxHp:800,hp:800,blocksAttack:true}],evacPoints:[{id:'evac_1',name:'撤离点',x:0,y:8,allowedTeams:['ally']}],victory:{type:'eliminate-or-evacuate'}};}
-  function triggerSchema(){return{trigger:"<BATTLE>\\n合集=...\\n场景=...\\n尺寸=9\\n我方=...\\n敌方=...\\n障碍=...\\n撤离=...\\n目标=...\\n</BATTLE>"};}
+  function skillSchema(){return{
+    id:'skill_id',name:'技能名',kind:'attack',
+    castMask:{shape:'diamond',radius:2,includeOrigin:false},
+    effectMask:{shape:'single',radius:0},
+    multiplier:1.2,aiWeight:1,
+    coreEffects:[
+      {type:'damage',target:'enemies',multiplier:1.2,hitCheck:true,canCrit:true,affectsObstacles:true}
+    ],
+    qiCost:30,cooldown:2,hitMod:0,canMoveAfterAction:false,
+    description:'',
+    rules:[]
+  };}
+
+  function equipSchema(){return{
+    id:'equip_id',name:'装备名',slot:'weapon',description:'',
+    modifiers:{
+      attack:20,defense:0,maxHp:0,maxQi:0,qiSpeed:0,move:0,
+      crit:0,dodge:0,accuracy:0,statusResist:0
+    },
+    rules:[]
+  };}
+
+  function statusSchema(){return{
+    id:'status_id',name:'状态名',polarity:'debuff',icon:'🩸',
+    tags:['physical'],controlTags:[],conflicts:[],applyChance:100,
+    description:'',maxStacks:3,stackMode:'add_refresh',dispellable:true,
+    duration:{type:'turns',turns:3},
+    modifiers:[{stat:'defense',mode:'percent',value:-10,perStack:true}],
+    threshold:{stacks:3,consume:'all',effects:[]},
+    rules:[]
+  };}
+
+  function talentSchema(){return{
+    id:'talent_id',name:'天赋名',rarity:'uncommon',type:'triggered',weight:70,
+    triggerScope:'once_per_action',description:'',
+    conditions:[{event:'attack_hit',subject:'self',field:'hit',op:'==',value:true}],
+    effects:[{type:'modify_stat',target:'self',stat:'attack',mode:'percent',value:10}],
+    duration:{type:'turns',turns:2},cooldown:0,
+    rules:[]
+  };}
+
+  function sceneSchema(){return{
+    schema:'tavern-battle-scene',version:1,id:'scene_id',name:'场景名',boardSize:9,
+    placements:[
+      {team:'ally',ref:'hero',x:1,y:7,facing:'N'},
+      {team:'enemy',ref:'enemy',instanceId:'enemy_1',x:6,y:2,facing:'S'}
+    ],
+    obstacles:[
+      {id:'rock_1',name:'巨石',x:4,y:4,maxHp:800,hp:800,blocksMovement:true,blocksAttack:true}
+    ],
+    evacPoints:[{id:'evac_1',name:'撤离点',x:0,y:8,allowedTeams:['ally']}],
+    victory:{type:'eliminate-or-evacuate'}
+  };}
+
+  function triggerSchema(){return{
+    trigger:"<BATTLE>\\n合集=...\\n场景=...\\n尺寸=9\\n我方=...\\n敌方=...\\n障碍=...\\n撤离=...\\n目标=...\\n</BATTLE>"
+  };}
+
 })();

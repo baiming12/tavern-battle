@@ -325,6 +325,127 @@ async function saveCollectionFromFrame(){
   }
 }
 
+function recentStoryContext(limit=8){
+  const c=ctx();
+  const messages=(c.chat||[])
+    .filter(m=>m && !m.is_system)
+    .slice(-Math.max(1,Number(limit||8)));
+
+  if(!messages.length) return '（当前聊天还没有可参考的最近剧情。）';
+
+  return messages.map(m=>{
+    const role=m.is_user?'用户':(m.name||c.name2||'AI');
+    return `【${role}】\n${String(m.mes||'').trim()}`;
+  }).join('\n\n');
+}
+
+function currentCharacterReference(){
+  const c=ctx();
+  if(c.groupId) return '（当前为群聊；角色卡参考由最近剧情和世界书承担。）';
+  const ch=c.characters?.[c.characterId];
+  const data=ch?.data||ch||{};
+  const parts=[
+    data.name||ch?.name ? `名称：${data.name||ch?.name}` : '',
+    data.description ? `角色描述：${data.description}` : '',
+    data.personality ? `性格：${data.personality}` : '',
+    data.scenario ? `场景设定：${data.scenario}` : ''
+  ].filter(Boolean);
+  return parts.join('\n') || '（当前角色卡没有可用文本字段。）';
+}
+
+function worldInfoScanData(){
+  const c=ctx();
+  const ch=c.groupId?null:c.characters?.[c.characterId];
+  const data=ch?.data||ch||{};
+  const depthPrompt=data?.extensions?.depth_prompt?.prompt||data?.depth_prompt?.prompt||'';
+  return {
+    trigger:'normal',
+    personaDescription:c.powerUserSettings?.persona_description||'',
+    characterDescription:data.description||'',
+    characterPersonality:data.personality||'',
+    characterDepthPrompt:depthPrompt,
+    scenario:data.scenario||'',
+    creatorNotes:data.creator_notes||data.creatorcomment||''
+  };
+}
+
+function flattenWorldInfoPrompt(result){
+  if(!result) return '';
+  const chunks=[];
+  const add=value=>{
+    if(value===null||value===undefined)return;
+    if(typeof value==='string'){
+      const t=value.trim();
+      if(t)chunks.push(t);
+      return;
+    }
+    if(Array.isArray(value)){
+      value.forEach(add);
+      return;
+    }
+    if(typeof value==='object'){
+      if(typeof value.content==='string')add(value.content);
+      if(Array.isArray(value.entries))add(value.entries);
+      return;
+    }
+  };
+
+  add(result.worldInfoBefore);
+  add(result.worldInfoAfter);
+  add(result.worldInfoExamples);
+  add(result.worldInfoDepth);
+  add(result.anBefore);
+  add(result.anAfter);
+  for(const values of Object.values(result.outletEntries||{})) add(values);
+
+  const seen=new Set();
+  return chunks.filter(x=>{
+    const key=x.trim();
+    if(!key||seen.has(key))return false;
+    seen.add(key);
+    return true;
+  }).join('\n\n');
+}
+
+async function activeWorldInfoContext(){
+  const c=ctx();
+  if(typeof c.getWorldInfoPrompt!=='function'){
+    return '（当前 SillyTavern 版本未暴露 getWorldInfoPrompt，无法读取激活世界书。）';
+  }
+
+  const scanChat=(c.chat||[])
+    .filter(m=>m && !m.is_system)
+    .map(m=>String(m.mes||''))
+    .reverse();
+
+  const result=await c.getWorldInfoPrompt(
+    scanChat,
+    Number(c.maxContext||8192),
+    true,
+    worldInfoScanData()
+  );
+
+  const text=flattenWorldInfoPrompt(result);
+  return text || '（按照当前聊天扫描，没有世界书条目被激活。）';
+}
+
+async function dataAIReferenceContext({includeStory=true,includeWorldInfo=true}={}){
+  const chunks=[];
+
+  if(includeStory){
+    chunks.push(`[最近剧情参考]\n${recentStoryContext(8)}`);
+    chunks.push(`[当前角色参考]\n${currentCharacterReference()}`);
+  }
+
+  if(includeWorldInfo){
+    chunks.push(`[当前激活世界书]\n${await activeWorldInfoContext()}`);
+  }
+
+  return chunks.length
+    ? chunks.join('\n\n')
+    : '[剧情 / 世界书参考]\n（本次未附加剧情或世界书。）';
+}
+
 function schemaFromExample(value){
   if(Array.isArray(value)){
     return {type:'array',items:value.length?schemaFromExample(value[0]):{}};
@@ -344,29 +465,68 @@ function schemaFromExample(value){
   return {};
 }
 
-async function aiProviderGenerate({kind,prompt,schema}){
+async function aiProviderGenerate({
+  kind,
+  operation='modify',
+  prompt,
+  schema,
+  current=null,
+  hints=null,
+  includeStory=true,
+  includeWorldInfo=true,
+  extraRequirements='',
+  plainText=false
+}){
   const c=ctx();
-  const loader=c.loader?.show?.({blocking:false,message:`战斗数据 AI 填写：${kind}`,toastMode:'static'});
+  const actionLabel=operation==='create'?'新建':'修改';
+  const loader=c.loader?.show?.({
+    blocking:false,
+    message:`战斗数据 AI ${actionLabel}：${kind}`,
+    toastMode:'static'
+  });
+
   const systemPrompt=`你是“酒馆战斗”的结构化数据编辑器，不是小说作者，也不是角色扮演者。
-你的唯一任务是根据用户给出的设计要求和现有战斗数据库，填写一个可以被程序直接读取的数据对象。
+你的唯一任务是依据提供的参考资料、现有战斗数据库和用户要求，创建或修改一个可以被程序直接读取的数据对象。
 
 强制规则：
-- 不续写故事，不描写动作，不与用户聊天。
-- 不模仿当前角色，不遵循当前小说写作风格去输出正文。
-- 优先复用提供的已有 ID。
-- 只输出符合要求的数据；若要求 JSON，则只输出 JSON，不要 Markdown 代码块，不要解释。`;
-
-  const rawPrompt=`${dataAiContext(kind)}\n\n[本次编辑要求]\n${prompt}`;
+- 不续写故事，不描写战斗过程，不与用户聊天。
+- 当前小说预设、角色口吻和文风只可作为设定背景，不得影响输出格式。
+- 世界书和最近剧情只用于判断世界观、人物身份、装备层级、技能风格与合理强度。
+- 不为了推动某个剧情结果故意加强或削弱数值。
+- 优先复用已有技能 / 装备 / 天赋 / 状态 ID。
+- 不把中文显示名称当作 ID。
+- CREATE 模式必须创建全新对象与唯一 ID，不复制当前对象。
+- MODIFY 模式默认保持原 id，不丢失未要求删除的复杂规则。
+- 若要求 JSON，只输出合法 JSON，不要 Markdown 代码块，不要解释。`;
 
   try{
+    const referenceContext=await dataAIReferenceContext({includeStory,includeWorldInfo});
+    const databaseContext=dataAiContext(kind);
+
+    const operationContext=operation==='modify'
+      ? `[操作语义]\nMODIFY：当前对象是修改基底。默认保持 id=${current?.id||'（未知）'}。`
+      : `[操作语义]\nCREATE：生成一个全新的 ${kind}；ID 必须与现有数据库不同。`;
+
+    const extra=String(extraRequirements||'').trim();
+    const rawPrompt=[
+      databaseContext,
+      referenceContext,
+      operationContext,
+      hints&&Object.keys(hints).length?`[固定约束]\n${JSON.stringify(hints,null,2)}`:'',
+      extra?`[用户补充要求]\n${extra}`:'',
+      `[本次数据任务]\n${prompt}`
+    ].filter(Boolean).join('\n\n');
+
     let raw;
-    const jsonSchema=schema&&typeof schema==='object'?{
-      name:`TavernBattle_${String(kind||'data').replace(/\\W/g,'_')}`,
+    const jsonSchema=!plainText && schema&&typeof schema==='object'?{
+      name:`TavernBattle_${String(kind||'data').replace(/\W/g,'_')}_${operation}`,
       strict:false,
-      value:{$schema:'http://json-schema.org/draft-04/schema#',...schemaFromExample(schema)}
+      value:{
+        $schema:'http://json-schema.org/draft-04/schema#',
+        ...schemaFromExample(schema)
+      }
     }:null;
 
-    // 数据编辑必须走 raw generation，避免把当前小说聊天、角色口吻和故事 Main Prompt 混进来。
     if(typeof c.generateRaw==='function'){
       try{
         raw=await c.generateRaw({
@@ -378,9 +538,9 @@ async function aiProviderGenerate({kind,prompt,schema}){
           jsonSchema
         });
       }catch(err){
-        console.warn('[TavernBattle] generateRaw structured request failed, retrying raw without schema',err);
+        console.warn('[TavernBattle] generateRaw structured request failed, retrying without schema',err);
         raw=await c.generateRaw({
-          prompt:`${rawPrompt}\n\n只输出合法 JSON。`,
+          prompt:`${rawPrompt}\n\n${plainText?'只输出要求的纯文本。':'只输出合法 JSON。'}`,
           systemPrompt,
           instructOverride:false,
           trimNames:false,
@@ -388,16 +548,22 @@ async function aiProviderGenerate({kind,prompt,schema}){
         });
       }
     }else{
-      // 老版本兼容兜底。这个路径仍可能继承聊天环境，因此给出更强的隔离提示。
       console.warn('[TavernBattle] generateRaw unavailable; falling back to generateQuietPrompt');
-      raw=await c.generateQuietPrompt({quietPrompt:`${systemPrompt}\n\n${rawPrompt}\n\n只输出合法 JSON。`,jsonSchema});
+      raw=await c.generateQuietPrompt({
+        quietPrompt:`${systemPrompt}\n\n${rawPrompt}\n\n${plainText?'只输出要求的纯文本。':'只输出合法 JSON。'}`,
+        jsonSchema
+      });
     }
 
     const text=String(raw||'').trim()
       .replace(/^```(?:json)?\s*/i,'')
       .replace(/\s*```$/,'');
+
+    if(plainText)return text;
     try{return JSON.parse(text);}
-    catch{return text;}
+    catch{
+      throw new Error(`模型没有返回合法 JSON。原始输出：${text.slice(0,300)}`);
+    }
   }finally{
     await loader?.hide?.();
   }
@@ -704,7 +870,7 @@ async function init(){
     }
   });
 
-  console.log('[TavernBattle] v0.16 initialized');
+  console.log('[TavernBattle] v0.17 initialized');
 }
 
 export async function onActivate(){
