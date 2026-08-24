@@ -1,0 +1,92 @@
+{
+  "schema": "tavern-battle-scene",
+  "version": 1,
+  "id": "bamboo-road-demo",
+  "name": "竹林山道",
+  "boardSize": 9,
+  "placements": [
+    {
+      "team": "ally",
+      "ref": "p1",
+      "x": 1,
+      "y": 6,
+      "facing": "N",
+      "overrides": {
+        "gauge": 58
+      }
+    },
+    {
+      "team": "ally",
+      "ref": "p2",
+      "x": 2,
+      "y": 7,
+      "facing": "N",
+      "overrides": {
+        "gauge": 20
+      }
+    },
+    {
+      "team": "enemy",
+      "ref": "e1",
+      "x": 6,
+      "y": 2,
+      "facing": "S",
+      "overrides": {
+        "gauge": 72
+      }
+    },
+    {
+      "team": "enemy",
+      "ref": "e2",
+      "x": 7,
+      "y": 3,
+      "facing": "W",
+      "overrides": {
+        "gauge": 35
+      }
+    }
+  ],
+  "obstacles": [
+    {
+      "id": "rock-1",
+      "name": "山石",
+      "x": 4,
+      "y": 3,
+      "maxHp": 520,
+      "hp": 520,
+      "blocksAttack": true
+    },
+    {
+      "id": "bamboo-1",
+      "name": "粗竹",
+      "x": 4,
+      "y": 4,
+      "maxHp": 360,
+      "hp": 360,
+      "blocksAttack": true
+    },
+    {
+      "id": "rock-2",
+      "name": "断壁",
+      "x": 5,
+      "y": 5,
+      "maxHp": 680,
+      "hp": 680,
+      "blocksAttack": true
+    }
+  ],
+  "evacPoints": [
+    {
+      "id": "exit-southwest",
+      "name": "西南撤离点",
+      "x": 0,
+      "y": 8,
+      "allowedTeams": [
+        "ally"
+      ]
+    }
+  ],
+  "victory": {
+    "type": "eliminate-or-evacuate"
+  }
+}

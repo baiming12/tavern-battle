@@ -1,0 +1,98 @@
+{
+  "iron_sword": {
+    "id": "iron_sword",
+    "name": "练习铁剑",
+    "slot": "weapon",
+    "description": "Demo装备",
+    "modifiers": {
+      "attack": 35,
+      "crit": 2,
+      "statusResist": 0
+    },
+    "rules": [
+      {
+        "id": "iron_sword_crit_gauge",
+        "conditions": [
+          {
+            "event": "attack_crit"
+          }
+        ],
+        "effects": [
+          {
+            "type": "gain_gauge",
+            "target": "self",
+            "value": 10
+          }
+        ],
+        "triggerScope": "once_per_action"
+      }
+    ]
+  },
+  "cloth_armor": {
+    "id": "cloth_armor",
+    "name": "青布劲装",
+    "slot": "armor",
+    "description": "Demo装备",
+    "modifiers": {
+      "defense": 28,
+      "maxHp": 120,
+      "statusResist": 0
+    }
+  },
+  "blood_blade": {
+    "id": "blood_blade",
+    "name": "饮血试作剑",
+    "slot": "weapon",
+    "description": "测试装备：攻击命中后吸取实际气血伤害的20%。",
+    "modifiers": {
+      "attack": 18
+    },
+    "rules": [
+      {
+        "id": "blood_blade_lifesteal",
+        "conditions": [
+          {
+            "event": "attack_hit"
+          }
+        ],
+        "effects": [
+          {
+            "type": "lifesteal",
+            "target": "self",
+            "value": 20
+          }
+        ],
+        "triggerScope": "per_target",
+        "cooldown": 0
+      }
+    ]
+  },
+  "mirror_armor": {
+    "id": "mirror_armor",
+    "name": "荆棘镜甲",
+    "slot": "armor",
+    "description": "测试装备：受到气血伤害时反伤25%。",
+    "modifiers": {
+      "defense": 20
+    },
+    "rules": [
+      {
+        "id": "mirror_reflect",
+        "conditions": [
+          {
+            "event": "damage_taken"
+          }
+        ],
+        "effects": [
+          {
+            "type": "reflect_damage",
+            "target": "attacker",
+            "value": 25
+          }
+        ],
+        "triggerScope": "per_event",
+        "cooldown": 0
+      }
+    ]
+  }
+}

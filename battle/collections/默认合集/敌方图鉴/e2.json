@@ -1,0 +1,25 @@
+{
+  "id": "e2",
+  "name": "黑衣刀客",
+  "short": "刀",
+  "team": "enemy",
+  "maxHp": 1040,
+  "hp": 1040,
+  "maxQi": 380,
+  "qi": 380,
+  "attack": 260,
+  "defense": 165,
+  "crit": 8,
+  "dodge": 4,
+  "accuracy": 1,
+  "qiSpeed": 420,
+  "move": 3,
+  "skills": [
+    "basic",
+    "second"
+  ],
+  "equipment": [],
+  "talents": [],
+  "statusResist": 0,
+  "immunities": []
+}

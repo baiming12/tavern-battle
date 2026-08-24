@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>酒馆战斗插件 Demo v0.14</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <h1>酒馆战斗插件 · Demo v0.14</h1>
+        <p>逸剑风格时间轴原型｜无原作素材</p>
+      </div>
+      <div class="top-controls">
+        <div class="seed-box" title="同一 Seed + 同一操作会得到相同的命中、暴击和伤害波动">
+          <label>Seed <input id="seedInput" inputmode="numeric" maxlength="10" /></label>
+          <button id="sameSeedBtn" class="secondary">同 Seed 重开</button>
+          <button id="newSeedBtn" class="secondary">新 Seed</button>
+        </div>
+        <div class="speed-box">
+          <button data-speed="1" class="speed-btn active">×1</button>
+          <button data-speed="2" class="speed-btn">×2</button>
+          <button data-speed="4" class="speed-btn">×4</button>
+          <button id="pauseBtn">暂停</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="timeline-panel card">
+      <div class="section-title">集气时间轴</div>
+      <div id="timeline"></div>
+    </section>
+
+    <section class="card data-panel">
+      <div class="data-panel-head">
+        <div>
+          <div class="section-title">场景 / 合集数据</div>
+          <div id="dataStatus" class="muted">默认合集 · 竹林山道</div>
+        </div>
+        <div class="data-actions">
+          <button id="importSceneBtn" class="secondary small">导入场景</button>
+          <button id="exportSceneBtn" class="secondary small">保存场景</button>
+          <button id="newCollectionBtn" class="secondary small">新建合集</button>
+          <button id="importCollectionBtn" class="secondary small">导入合集文件夹</button>
+          <button id="saveCollectionBtn" class="secondary small">保存合集文件夹</button>
+          <button id="exportCollectionBtn" class="secondary small">导出合集 JSON</button>
+        </div>
+      </div>
+      <div class="data-summary">
+        <span>场景：<b id="sceneNameText">竹林山道</b></span>
+        <span>障碍：<b id="obstacleCountText">0</b></span>
+        <span>撤离点：<b id="evacCountText">0</b></span>
+        <span>图鉴：我方 <b id="allyDexCount">0</b> / 中立 <b id="neutralDexCount">0</b> / 敌方 <b id="enemyDexCount">0</b></span>
+      </div>
+      <input id="sceneFileInput" type="file" accept=".json,application/json" hidden>
+      <input id="collectionFolderInput" type="file" accept=".json,application/json" webkitdirectory directory multiple hidden>
+    </section>
+
+    <section class="card editor-shell">
+      <div class="editor-head">
+        <div>
+          <div class="section-title">可视化数据编辑器</div>
+          <div class="muted">场景 · 图鉴 · 技能 · 装备 · 天赋 · 酒馆触发</div>
+        </div>
+        <div class="editor-head-actions">
+          <label class="editor-language-label">
+            <span>显示语言</span>
+            <select id="editorLanguageSelect">
+              <option value="zh" selected>中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <button id="toggleEditorBtn" class="secondary">展开编辑器</button>
+        </div>
+      </div>
+      <div id="editorRoot" class="editor-root" hidden></div>
+    </section>
+
+    <main class="main-grid">
+      <section class="battlefield card">
+        <div class="battlefield-head">
+          <div>
+            <div id="boardTitle" class="section-title">9 × 9 战场 · 竹林山道</div>
+            <div id="turnHint" class="muted">时间轴流动中……</div>
+          </div>
+          <div class="legend">
+            <span><i class="dot ally"></i>我方</span>
+            <span><i class="dot enemy"></i>敌方</span>
+            <span><i class="dot selected"></i>当前</span>
+            <span><i class="dot range"></i>招式射程</span>
+            <span><i class="dot aoe"></i>打击预览</span>
+            <span><i class="dot obstacle"></i>障碍</span>
+            <span><i class="dot evac"></i>撤离点</span>
+          </div>
+        </div>
+        <div id="board" class="board" aria-label="battle board"></div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="card status-card">
+          <div class="section-title">当前角色</div>
+          <div id="actorCard" class="actor-card empty">尚未轮到任何角色</div>
+        </section>
+
+        <section class="card actions-card">
+          <div class="section-title">行动</div>
+          <div id="actions" class="actions"></div>
+          <div id="skillDetail" class="skill-detail empty">选择技能后显示技能数据</div>
+          <button id="cancelModeBtn" class="secondary wide" disabled>取消选择</button>
+        </section>
+
+        <section class="card log-card">
+          <div class="section-title log-title-row">
+            <span>战斗日志</span>
+            <button id="copyLogBtn" class="secondary small">复制 AI 日志</button>
+          </div>
+          <pre id="log"></pre>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <dialog id="resultDialog">
+    <div class="result-box">
+      <h2 id="resultTitle">战斗结束</h2>
+      <pre id="resultText"></pre>
+      <div class="dialog-actions">
+        <button id="copyResultBtn">复制 AI 战斗包</button>
+        <button id="restartBtn" class="secondary">重新开始</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>

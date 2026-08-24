@@ -1,0 +1,84 @@
+{
+  "quick_breath": {
+    "id": "quick_breath",
+    "name": "行气如流",
+    "rarity": "common",
+    "type": "passive",
+    "weight": 100,
+    "description": "被动：集气速率 +8%。",
+    "conditions": [],
+    "effects": [
+      {
+        "type": "modify_stat",
+        "target": "self",
+        "stat": "qiSpeed",
+        "mode": "percent",
+        "value": 8
+      }
+    ],
+    "duration": {
+      "type": "permanent",
+      "turns": 0
+    }
+  },
+  "last_stand": {
+    "id": "last_stand",
+    "name": "困兽",
+    "rarity": "rare",
+    "type": "triggered",
+    "weight": 45,
+    "description": "当气血低于30%时，触发攻击提升20%，维持2回合。",
+    "conditions": [
+      {
+        "event": "hp_changed",
+        "subject": "self",
+        "field": "hpPercent",
+        "op": "<=",
+        "value": 30
+      }
+    ],
+    "effects": [
+      {
+        "type": "modify_stat",
+        "target": "self",
+        "stat": "attack",
+        "mode": "percent",
+        "value": 20
+      }
+    ],
+    "duration": {
+      "type": "turns",
+      "turns": 2
+    },
+    "cooldown": 3
+  },
+  "wind_after_strike": {
+    "id": "wind_after_strike",
+    "name": "乘隙而行",
+    "rarity": "uncommon",
+    "type": "triggered",
+    "weight": 70,
+    "description": "攻击命中后获得1点临时移动力。",
+    "conditions": [
+      {
+        "event": "attack_hit",
+        "subject": "self",
+        "field": "hit",
+        "op": "==",
+        "value": true
+      }
+    ],
+    "effects": [
+      {
+        "type": "grant_move",
+        "target": "self",
+        "value": 1
+      }
+    ],
+    "duration": {
+      "type": "action",
+      "turns": 0
+    },
+    "triggerScope": "once_per_action"
+  }
+}

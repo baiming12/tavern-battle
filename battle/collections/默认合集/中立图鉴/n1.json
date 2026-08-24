@@ -1,0 +1,22 @@
+{
+  "id": "n1",
+  "name": "中立路人",
+  "short": "路",
+  "team": "neutral",
+  "maxHp": 500,
+  "hp": 500,
+  "maxQi": 100,
+  "qi": 100,
+  "attack": 80,
+  "defense": 80,
+  "crit": 0,
+  "dodge": 0,
+  "accuracy": 0,
+  "qiSpeed": 100,
+  "move": 3,
+  "skills": [],
+  "equipment": [],
+  "talents": [],
+  "statusResist": 0,
+  "immunities": []
+}

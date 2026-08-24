@@ -1,0 +1,16 @@
+{
+  "display_name": "酒馆战斗",
+  "loading_order": 50,
+  "requires": [],
+  "optional": [],
+  "dependencies": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Tavern Battle Prototype",
+  "version": "0.15.0",
+  "minimum_client_version": "1.18.0",
+  "auto_update": false,
+  "hooks": {
+    "activate": "onActivate"
+  }
+}

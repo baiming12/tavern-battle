@@ -1,0 +1,280 @@
+{
+  "basic": {
+    "id": "basic",
+    "name": "一式·平斩",
+    "kind": "attack",
+    "castMask": {
+      "shape": "diamond",
+      "radius": 1,
+      "includeOrigin": false
+    },
+    "effectMask": {
+      "shape": "single"
+    },
+    "multiplier": 1.0,
+    "qiCost": 0,
+    "cooldown": 0,
+    "hitMod": 0,
+    "description": "近身单体攻击",
+    "coreEffects": [
+      {
+        "type": "damage",
+        "target": "enemies",
+        "multiplier": 1.0,
+        "hitCheck": true,
+        "canCrit": true,
+        "affectsObstacles": true
+      }
+    ],
+    "aiWeight": 1.0
+  },
+  "second": {
+    "id": "second",
+    "name": "二式·回风",
+    "kind": "attack",
+    "castMask": {
+      "shape": "diamond",
+      "radius": 2,
+      "includeOrigin": false
+    },
+    "effectMask": {
+      "shape": "single"
+    },
+    "multiplier": 1.25,
+    "qiCost": 35,
+    "cooldown": 2,
+    "hitMod": 6,
+    "description": "两格内单体攻击；命中附加1层流血",
+    "coreEffects": [
+      {
+        "type": "damage",
+        "target": "enemies",
+        "multiplier": 1.25,
+        "hitCheck": true,
+        "canCrit": true,
+        "affectsObstacles": true
+      },
+      {
+        "type": "apply_status",
+        "target": "enemies",
+        "statusId": "bleeding",
+        "stacks": 1,
+        "chance": 100,
+        "requiresHit": true
+      }
+    ],
+    "aiWeight": 1.0
+  },
+  "third": {
+    "id": "third",
+    "name": "三式·横云",
+    "kind": "attack",
+    "castMask": {
+      "shape": "diamond",
+      "radius": 2,
+      "includeOrigin": false
+    },
+    "effectMask": {
+      "shape": "cross",
+      "radius": 1
+    },
+    "multiplier": 1.38,
+    "qiCost": 55,
+    "cooldown": 3,
+    "hitMod": 8,
+    "canMoveAfterAction": true,
+    "description": "十字范围；攻击后可移动",
+    "coreEffects": [
+      {
+        "type": "damage",
+        "target": "enemies",
+        "multiplier": 1.38,
+        "hitCheck": true,
+        "canCrit": true,
+        "affectsObstacles": true
+      }
+    ],
+    "aiWeight": 1.0
+  },
+  "ultimate": {
+    "id": "ultimate",
+    "name": "绝式·惊鸿",
+    "kind": "attack",
+    "castMask": {
+      "shape": "diamond",
+      "radius": 2,
+      "includeOrigin": false
+    },
+    "effectMask": {
+      "shape": "diamond",
+      "radius": 1
+    },
+    "multiplier": 1.65,
+    "qiCost": 80,
+    "cooldown": 5,
+    "hitMod": 10,
+    "description": "以落点为中心攻击周围1格，并将命中的敌人击退1格",
+    "coreEffects": [
+      {
+        "type": "damage",
+        "target": "enemies",
+        "multiplier": 1.65,
+        "hitCheck": true,
+        "canCrit": true,
+        "affectsObstacles": true
+      },
+      {
+        "type": "push",
+        "target": "enemies",
+        "distance": 1,
+        "requiresHit": true
+      }
+    ],
+    "aiWeight": 1.0
+  },
+  "qinggong": {
+    "id": "qinggong",
+    "name": "轻功·踏风",
+    "kind": "qinggong",
+    "range": 4,
+    "qiCost": 25,
+    "cooldown": 3,
+    "description": "位移",
+    "aiWeight": 1.0
+  },
+  "neigong": {
+    "id": "neigong",
+    "name": "心法·聚气",
+    "kind": "buff",
+    "range": 0,
+    "qiCost": 45,
+    "cooldown": 5,
+    "description": "自身获得聚气3回合，并获得25集气",
+    "rules": [
+      {
+        "id": "neigong_gather",
+        "conditions": [
+          {
+            "event": "skill_used"
+          }
+        ],
+        "effects": [
+          {
+            "type": "apply_status",
+            "target": "self",
+            "statusId": "gathering",
+            "stacks": 1
+          },
+          {
+            "type": "gain_gauge",
+            "target": "self",
+            "value": 25
+          }
+        ],
+        "triggerScope": "once_per_action"
+      }
+    ],
+    "aiWeight": 1.0
+  },
+  "shadow_step_strike": {
+    "id": "shadow_step_strike",
+    "name": "影袭",
+    "kind": "attack",
+    "castMask": {
+      "shape": "diamond",
+      "radius": 2,
+      "includeOrigin": false
+    },
+    "effectMask": {
+      "shape": "single",
+      "radius": 0
+    },
+    "multiplier": 1.15,
+    "coreEffects": [
+      {
+        "type": "teleport_behind",
+        "target": "enemies",
+        "requiresHit": false
+      },
+      {
+        "type": "damage",
+        "target": "enemies",
+        "multiplier": 1.15,
+        "hitCheck": true,
+        "canCrit": true,
+        "affectsObstacles": false
+      },
+      {
+        "type": "lifesteal",
+        "value": 15
+      }
+    ],
+    "qiCost": 35,
+    "cooldown": 3,
+    "hitMod": 5,
+    "canMoveAfterAction": false,
+    "description": "闪到目标背后再攻击，并吸取15%的实际气血伤害。",
+    "aiWeight": 1.0
+  },
+  "summon_training_dummy": {
+    "id": "summon_training_dummy",
+    "name": "唤援·练习守卫",
+    "kind": "attack",
+    "castMask": {
+      "shape": "diamond",
+      "radius": 2,
+      "includeOrigin": true
+    },
+    "effectMask": {
+      "shape": "single",
+      "radius": 0
+    },
+    "multiplier": 0,
+    "coreEffects": [
+      {
+        "type": "summon_unit",
+        "templateRef": "p2",
+        "templateTeam": "ally",
+        "summonTeam": "same",
+        "startGauge": 0
+      }
+    ],
+    "qiCost": 50,
+    "cooldown": 5,
+    "hitMod": 0,
+    "canMoveAfterAction": false,
+    "description": "测试召唤：在落点附近召唤一个使用队友模板的同阵营单位。",
+    "aiWeight": 1.0
+  },
+  "summon_mist": {
+    "id": "summon_mist",
+    "name": "烟障",
+    "kind": "attack",
+    "castMask": {
+      "shape": "diamond",
+      "radius": 3,
+      "includeOrigin": true
+    },
+    "effectMask": {
+      "shape": "single",
+      "radius": 0
+    },
+    "multiplier": 0,
+    "coreEffects": [
+      {
+        "type": "summon_object",
+        "objectName": "烟雾区域",
+        "hp": 80,
+        "durationTurns": 2,
+        "blocksMovement": false,
+        "blocksAttack": true
+      }
+    ],
+    "qiCost": 30,
+    "cooldown": 4,
+    "hitMod": 0,
+    "canMoveAfterAction": false,
+    "description": "测试地面物：生成不挡路、但阻断攻击射线的烟雾区域。",
+    "aiWeight": 1.0
+  }
+}

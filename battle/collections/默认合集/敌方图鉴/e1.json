@@ -1,0 +1,25 @@
+{
+  "id": "e1",
+  "name": "黑衣剑客",
+  "short": "剑",
+  "team": "enemy",
+  "maxHp": 900,
+  "hp": 900,
+  "maxQi": 400,
+  "qi": 400,
+  "attack": 235,
+  "defense": 150,
+  "crit": 9,
+  "dodge": 5,
+  "accuracy": 2,
+  "qiSpeed": 440,
+  "move": 4,
+  "skills": [
+    "basic",
+    "second"
+  ],
+  "equipment": [],
+  "talents": [],
+  "statusResist": 0,
+  "immunities": []
+}

@@ -1,0 +1,236 @@
+{
+  "gathering": {
+    "id": "gathering",
+    "name": "聚气",
+    "polarity": "buff",
+    "description": "集气速率提升。",
+    "maxStacks": 1,
+    "stackMode": "refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 3
+    },
+    "modifiers": [
+      {
+        "stat": "qiSpeed",
+        "mode": "percent",
+        "value": 25,
+        "perStack": false
+      }
+    ],
+    "rules": [],
+    "icon": "⚡",
+    "tags": [
+      "qi"
+    ],
+    "controlTags": [],
+    "conflicts": [],
+    "applyChance": 100
+  },
+  "bleeding": {
+    "id": "bleeding",
+    "name": "流血",
+    "polarity": "debuff",
+    "description": "行动结束时受到伤害，可叠3层。",
+    "maxStacks": 3,
+    "stackMode": "add_refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 3
+    },
+    "modifiers": [],
+    "rules": [
+      {
+        "id": "bleeding_tick",
+        "conditions": [
+          {
+            "event": "turn_end"
+          }
+        ],
+        "effects": [
+          {
+            "type": "deal_damage",
+            "target": "self",
+            "value": 28,
+            "mode": "flat",
+            "perStack": true
+          }
+        ],
+        "triggerScope": "per_event"
+      }
+    ],
+    "icon": "🩸",
+    "tags": [
+      "bleed",
+      "physical"
+    ],
+    "controlTags": [],
+    "conflicts": [],
+    "applyChance": 100,
+    "threshold": {
+      "stacks": 3,
+      "consume": "threshold",
+      "effects": [
+        {
+          "type": "deal_damage",
+          "target": "self",
+          "value": 60,
+          "mode": "flat"
+        }
+      ]
+    }
+  },
+  "broken_guard": {
+    "id": "broken_guard",
+    "name": "破防",
+    "polarity": "debuff",
+    "description": "防御降低20%。",
+    "maxStacks": 1,
+    "stackMode": "refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 2
+    },
+    "modifiers": [
+      {
+        "stat": "defense",
+        "mode": "percent",
+        "value": -20,
+        "perStack": false
+      }
+    ],
+    "rules": [],
+    "icon": "🛡",
+    "tags": [
+      "physical",
+      "defense_down"
+    ],
+    "controlTags": [],
+    "conflicts": [],
+    "applyChance": 100
+  },
+  "stunned": {
+    "id": "stunned",
+    "name": "眩晕",
+    "polarity": "debuff",
+    "icon": "💫",
+    "tags": [
+      "control"
+    ],
+    "controlTags": [
+      "stun"
+    ],
+    "conflicts": [],
+    "applyChance": 100,
+    "description": "无法移动或执行正式行动；轮到自身时直接跳过。",
+    "maxStacks": 1,
+    "stackMode": "refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 1
+    },
+    "modifiers": [],
+    "rules": []
+  },
+  "rooted": {
+    "id": "rooted",
+    "name": "定身",
+    "polarity": "debuff",
+    "icon": "⛓",
+    "tags": [
+      "control",
+      "movement"
+    ],
+    "controlTags": [
+      "root"
+    ],
+    "conflicts": [],
+    "applyChance": 100,
+    "description": "无法普通移动，也不能使用轻功位移。",
+    "maxStacks": 1,
+    "stackMode": "refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 2
+    },
+    "modifiers": [],
+    "rules": []
+  },
+  "silenced": {
+    "id": "silenced",
+    "name": "封技",
+    "polarity": "debuff",
+    "icon": "🤐",
+    "tags": [
+      "control",
+      "skill_lock"
+    ],
+    "controlTags": [
+      "silence"
+    ],
+    "conflicts": [],
+    "applyChance": 100,
+    "description": "无法使用心法 / Buff 类技能。",
+    "maxStacks": 1,
+    "stackMode": "refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 2
+    },
+    "modifiers": [],
+    "rules": []
+  },
+  "disarmed": {
+    "id": "disarmed",
+    "name": "缴械",
+    "polarity": "debuff",
+    "icon": "🚫",
+    "tags": [
+      "control",
+      "weapon_lock"
+    ],
+    "controlTags": [
+      "disarm"
+    ],
+    "conflicts": [],
+    "applyChance": 100,
+    "description": "无法使用攻击类招式。",
+    "maxStacks": 1,
+    "stackMode": "refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 2
+    },
+    "modifiers": [],
+    "rules": []
+  },
+  "barrier": {
+    "id": "barrier",
+    "name": "护体真气",
+    "polarity": "buff",
+    "icon": "🫧",
+    "tags": [
+      "shield"
+    ],
+    "controlTags": [],
+    "conflicts": [],
+    "applyChance": 100,
+    "description": "示例状态：用于护盾类技能/规则标记。",
+    "maxStacks": 1,
+    "stackMode": "refresh",
+    "dispellable": true,
+    "duration": {
+      "type": "turns",
+      "turns": 2
+    },
+    "modifiers": [],
+    "rules": []
+  }
+}

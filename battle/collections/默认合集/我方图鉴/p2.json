@@ -1,0 +1,28 @@
+{
+  "id": "p2",
+  "name": "队友",
+  "short": "友",
+  "team": "ally",
+  "maxHp": 980,
+  "hp": 980,
+  "maxQi": 440,
+  "qi": 440,
+  "attack": 245,
+  "defense": 190,
+  "crit": 10,
+  "dodge": 6,
+  "accuracy": 3,
+  "qiSpeed": 465,
+  "move": 4,
+  "skills": [
+    "basic",
+    "second",
+    "third",
+    "qinggong",
+    "neigong"
+  ],
+  "equipment": [],
+  "talents": [],
+  "statusResist": 0,
+  "immunities": []
+}

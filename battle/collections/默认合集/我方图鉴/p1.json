@@ -1,0 +1,34 @@
+{
+  "id": "p1",
+  "name": "宇文逸",
+  "short": "逸",
+  "team": "ally",
+  "maxHp": 1120,
+  "hp": 1120,
+  "maxQi": 520,
+  "qi": 520,
+  "attack": 285,
+  "defense": 175,
+  "crit": 14,
+  "dodge": 7,
+  "accuracy": 5,
+  "qiSpeed": 505,
+  "move": 4,
+  "skills": [
+    "basic",
+    "second",
+    "third",
+    "ultimate",
+    "qinggong",
+    "neigong"
+  ],
+  "equipment": [
+    "iron_sword",
+    "cloth_armor"
+  ],
+  "talents": [
+    "quick_breath"
+  ],
+  "statusResist": 0,
+  "immunities": []
+}
