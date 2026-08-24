@@ -95,10 +95,171 @@ function currentCollectionForAI(){
   return settings().collection;
 }
 
+function fmtNumber(v){
+  const n=Number(v||0);
+  return Number.isInteger(n)?String(n):n.toFixed(2).replace(/0+$/,'').replace(/\.$/,'');
+}
+
+function nonZeroModifiers(modifiers={}){
+  const entries=Object.entries(modifiers||{}).filter(([,v])=>Number(v)!==0);
+  return entries.length
+    ? entries.map(([k,v])=>`${k}${Number(v)>=0?'+':''}${fmtNumber(v)}`).join('，')
+    : '无属性修正';
+}
+
+function compactEffect(effect={}){
+  const target=effect.target?`→${effect.target}`:'';
+  if(effect.type==='damage') return `伤害${fmtNumber(effect.multiplier||1)}x${target}`;
+  if(effect.type==='heal') return `治疗${fmtNumber(effect.value)}${effect.mode==='percent'?'%':''}${target}`;
+  if(effect.type==='apply_status') return `施加${effect.statusId||'?'}×${effect.stacks||1}${target}`;
+  if(effect.type==='push') return `击退${effect.distance||1}格${target}`;
+  if(effect.type==='pull') return `拉拽${effect.distance||1}格${target}`;
+  if(effect.type==='move_self') return `自身位移${effect.distance||1}格`;
+  if(effect.type==='shield') return `护盾${fmtNumber(effect.value)}${effect.mode==='percent'?'%':''}${target}`;
+  if(effect.type==='lifesteal') return `吸血${fmtNumber(effect.value)}%`;
+  if(effect.type==='reflect_damage') return `反伤${fmtNumber(effect.value)}%`;
+  if(effect.type==='gain_gauge') return `集气${Number(effect.value)>=0?'+':''}${fmtNumber(effect.value)}${target}`;
+  if(effect.type==='refund_qi') return `真气${Number(effect.value)>=0?'+':''}${fmtNumber(effect.value)}${target}`;
+  if(effect.type==='modify_stat') return `${effect.stat||'?'}${effect.mode==='percent'?`${fmtNumber(effect.value)}%`:`${Number(effect.value)>=0?'+':''}${fmtNumber(effect.value)}`}${target}`;
+  if(effect.type==='dispel') return `驱散${effect.polarity||'any'}×${effect.count||1}${target}`;
+  if(effect.type==='summon_unit') return `召唤${effect.templateRef||'?'}${target}`;
+  if(effect.type==='summon_object') return `生成地面物「${effect.objectName||'?'}」`;
+  return effect.type||'未知效果';
+}
+
+function compactRule(rule={}){
+  const events=(rule.conditions||[]).filter(c=>c.event).map(c=>c.event).join('+')||'事件?';
+  const extra=(rule.conditions||[]).filter(c=>c.field).map(c=>`${c.field}${c.op||'=='}${String(c.value)}`).join('&');
+  const effects=(rule.effects||[]).map(compactEffect).join(' + ')||'无效果';
+  return `${events}${extra?`[${extra}]`:''} => ${effects}${rule.cooldown?`（内CD${rule.cooldown}）`:''}`;
+}
+
+function equipmentReferenceContext(collection){
+  const items=Object.values(collection?.equipment||{});
+  if(!items.length) return '[装备强度基准]\n（当前合集没有已有装备可参考。）';
+
+  const stats=['attack','defense','maxHp','maxQi','qiSpeed','move','crit','dodge','accuracy','statusResist'];
+  const slots=['weapon','armor','accessory','other'];
+  const lines=['[装备强度基准]'];
+
+  for(const slot of slots){
+    const group=items.filter(x=>(x.slot||'other')===slot);
+    if(!group.length) continue;
+    lines.push(`\n${slot}：${group.length}件`);
+
+    const ranges=[];
+    for(const stat of stats){
+      const vals=group.map(x=>Number(x.modifiers?.[stat]||0)).filter(v=>Number.isFinite(v));
+      if(!vals.length || vals.every(v=>v===0)) continue;
+      const sorted=[...vals].sort((a,b)=>a-b);
+      const med=sorted[Math.floor((sorted.length-1)/2)];
+      ranges.push(`${stat} ${fmtNumber(sorted[0])}~${fmtNumber(sorted[sorted.length-1])}（中位${fmtNumber(med)}）`);
+    }
+    if(ranges.length) lines.push(`  属性范围：${ranges.join('；')}`);
+
+    const examples=group.slice(0,12);
+    for(const e of examples){
+      const rules=(e.rules||[]).map(compactRule).join('；')||'无规则';
+      lines.push(`  - ${e.name||e.id} [${e.id}]｜${nonZeroModifiers(e.modifiers)}｜规则：${rules}${e.description?`｜${e.description}`:''}`);
+    }
+    if(group.length>examples.length) lines.push(`  - ……另有 ${group.length-examples.length} 件未展开`);
+  }
+
+  lines.push('\n生成新装备时应以以上同槽位范围和实例为标尺；除非补充要求明确是珍稀/神器级，否则不要显著突破现有同类上限。');
+  return lines.join('\n');
+}
+
+function skillReferenceContext(collection){
+  const items=Object.values(collection?.skills||{});
+  if(!items.length) return '[技能强度基准]\n（当前合集没有已有技能可参考。）';
+
+  const lines=['[技能强度基准]'];
+  for(const s of items.slice(0,24)){
+    const core=(s.coreEffects||[]).map(compactEffect).join(' + ')||'无本体Effect';
+    const rules=(s.rules||[]).map(compactRule).join('；')||'无事件规则';
+    const cast=s.castMask?`${s.castMask.shape||'?'}/${s.castMask.radius??0}`:'?';
+    const area=s.effectMask?`${s.effectMask.shape||'?'}/${s.effectMask.radius??0}`:'?';
+    lines.push(`- ${s.name||s.id} [${s.id}]｜${s.kind||'attack'}｜真气${s.qiCost||0}｜CD${s.cooldown||0}｜释放${cast}｜作用${area}｜${core}｜规则：${rules}`);
+  }
+  if(items.length>24) lines.push(`- ……另有 ${items.length-24} 个技能未展开`);
+  lines.push('生成新技能时参考现有真气消耗、CD、范围和倍率/Effect组合，不要在没有理由时全面碾压现有技能。');
+  return lines.join('\n');
+}
+
+function actorReferenceContext(collection){
+  const groups=[
+    ['我方',Object.values(collection?.allies||{})],
+    ['中立',Object.values(collection?.neutrals||{})],
+    ['敌方',Object.values(collection?.enemies||{})]
+  ];
+  const stats=['maxHp','maxQi','attack','defense','qiSpeed','move','crit','dodge','accuracy','statusResist'];
+  const lines=['[角色数值基准]'];
+
+  for(const [label,items] of groups){
+    if(!items.length) continue;
+    lines.push(`\n${label}：${items.length}个模板`);
+    const ranges=[];
+    for(const stat of stats){
+      const vals=items.map(x=>Number(x[stat]||0)).filter(v=>Number.isFinite(v));
+      if(!vals.length) continue;
+      ranges.push(`${stat} ${fmtNumber(Math.min(...vals))}~${fmtNumber(Math.max(...vals))}`);
+    }
+    lines.push(`  区间：${ranges.join('；')}`);
+    for(const a of items.slice(0,8)){
+      lines.push(`  - ${a.name||a.id} [${a.id}]｜HP${a.maxHp||0} Qi${a.maxQi||0} 攻${a.attack||0} 防${a.defense||0} 集气${a.qiSpeed||0} 移${a.move||0}｜技能${(a.skills||[]).join(',')||'无'}｜装备${(a.equipment||[]).join(',')||'无'}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+function statusReferenceContext(collection){
+  const items=Object.values(collection?.statuses||{});
+  if(!items.length) return '[状态参考]\n（空）';
+  return `[状态参考]\n${items.slice(0,30).map(s=>{
+    const mods=(s.modifiers||[]).map(m=>`${m.stat}:${m.mode}:${m.value}`).join(',')||'无属性修正';
+    const rules=(s.rules||[]).map(compactRule).join('；')||'无规则';
+    return `- ${s.name||s.id} [${s.id}]｜${s.polarity}｜层数${s.maxStacks||1}｜持续${s.duration?.type||'?'}:${s.duration?.turns??0}｜${mods}｜${rules}`;
+  }).join('\n')}`;
+}
+
+function talentReferenceContext(collection){
+  const items=Object.values(collection?.talents||{});
+  if(!items.length) return '[天赋参考]\n（空）';
+  return `[天赋参考]\n${items.slice(0,30).map(t=>{
+    const rules=(t.rules||[]).map(compactRule).join('；')||'无规则';
+    const effects=(t.effects||[]).map(compactEffect).join(' + ')||'无直接效果';
+    return `- ${t.name||t.id} [${t.id}]｜${t.rarity||'common'}｜${t.type||'passive'}｜${effects}｜规则：${rules}`;
+  }).join('\n')}`;
+}
+
+function taskReferenceContext(kind,collection){
+  if(kind==='equipment') return equipmentReferenceContext(collection);
+  if(kind==='skill') return [skillReferenceContext(collection),statusReferenceContext(collection)].join('\n\n');
+  if(kind==='actor') return [actorReferenceContext(collection),equipmentReferenceContext(collection),skillReferenceContext(collection)].join('\n\n');
+  if(kind==='status') return statusReferenceContext(collection);
+  if(kind==='talent') return [talentReferenceContext(collection),statusReferenceContext(collection)].join('\n\n');
+  if(kind==='scene'||kind==='battle_trigger') return actorLoadoutText(collection);
+  return '';
+}
+
 function dataAiContext(kind){
   const collection=currentCollectionForAI();
   const catalog=fullDataCatalog(collection);
-  return `[酒馆战斗数据上下文]\n当前任务类型：${kind}\n\n${catalog}\n\n引用规则：\n- 角色的 skills / equipment / talents 必须优先引用上面已经存在的 ID。\n- 技能或规则引用状态时，statusId 必须优先引用上面已有状态 ID。\n- 不要把中文名称当 ID。\n- 不要杜撰一个不存在的引用 ID；若确实需要新依赖，只生成当前被要求的对象，并在 description 中说明缺少的依赖，不要私自连带创建一整套新对象。`;
+  const references=taskReferenceContext(kind,collection);
+
+  return `[酒馆战斗数据上下文]
+当前任务类型：${kind}
+
+${catalog}
+
+${references}
+
+引用与强度规则：
+- 角色的 skills / equipment / talents 必须优先引用上面已经存在的 ID。
+- 技能或规则引用状态时，statusId 必须优先引用上面已有状态 ID。
+- 不要把中文名称当 ID。
+- 不要杜撰一个不存在的引用 ID；若确实需要新依赖，只生成当前被要求的对象，并在 description 中说明缺少的依赖，不要私自连带创建一整套新对象。
+- 新数据的数值强度必须参考同类已有数据；世界书/剧情决定“风格和层级”，现有数据库决定“数值标尺”。`;
 }
 
 function protocolText(){
@@ -108,23 +269,38 @@ function protocolText(){
     ? actorLoadoutText(collection)
     : '当前插件还未保存自定义合集；如需战斗，优先使用已知角色ID。';
 
-  return `[酒馆战斗协议]
-你正在与一个本地战斗小游戏协作。
+  return `[酒馆战斗协议：剧情 → 小游戏交接]
+此协议只规定“什么时候停止正文并把战斗交给小游戏”，不改变你原本的文风、人物塑造和小说预设。
 
-当且仅当剧情已经明确即将进入需要实际结算的战斗时：
-1. 正常叙事只能写到“第一项战斗动作发生之前”为止。
-2. 不得替任何角色决定攻击命中、伤害、闪避、移动、技能结果、死亡或最终胜负。
-3. 在回复最末尾附加一个 <BATTLE> 块。
-4. 若本次没有进入战斗，不得输出 <BATTLE>。
-5. 战斗中的事实由小游戏决定，战斗结束后会把事实重新提供给你续写。
+【必须交接的时刻】
+当剧情已经明确进入一场需要实际结算的战斗，并且“下一项不可逆的战斗动作”即将发生时，立刻停止正常正文。
+不可逆战斗动作包括但不限于：真正挥剑/开枪/施法攻击、冲锋接敌、主动战斗位移、第一次命中/闪避/受伤判定。
+
+正文最后允许写到：
+- 拔剑、摆开架势、杀意升起；
+- 双方对峙、包围完成；
+- 某人即将出手；
+- 战场环境和相对位置已经明确。
+
+正文绝对不能跨过：
+- 第一次攻击已经挥出并产生结果；
+- 谁先命中/闪避；
+- 任何伤害数值或明确伤势结果；
+- 战斗中的移动结果；
+- 技能实际是否成功；
+- 失去战斗能力、死亡、撤离或最终胜负。
+
+【交接格式】
+在停止正文后，整条回复的最后必须附加且只附加一个 <BATTLE> 数据块。
+<BATTLE> 是给程序读取的初始场景，不是小说正文。
+若本次没有真正进入战斗，不得输出 <BATTLE>。
 
 当前可引用角色及其现有配置：
 ${catalog}
 
-格式：
 <BATTLE>
 合集=${collection?.name||'默认合集'}
-场景=用简短中文描述当前战场
+场景=用简短中文描述当前战场，例如“雨夜客栈后院”
 尺寸=9
 我方=角色ID@列,行,朝向
 中立=
@@ -134,13 +310,20 @@ ${catalog}
 目标=eliminate-or-evacuate
 </BATTLE>
 
-规则：
-- 坐标从1开始。
-- 朝向只用 N/E/S/W。
-- 同一种模板重复出现时可用 #实例名。
-- 只引用当前图鉴中存在的角色ID；角色已有的技能、装备、天赋由图鉴模板自动载入，不要在 <BATTLE> 中重复填写。
-- 地图、障碍、初始位置应根据刚刚的剧情合理安排。
-- <BATTLE> 必须放在整条回复最后。`;
+【初始场景填写规则】
+- 坐标从1开始；朝向只用 N/E/S/W。
+- 根据刚刚正文已经描述的空间关系安排双方初始位置，不要随机乱放。
+- 单位不能与单位或障碍重叠。
+- 同一种敌人模板重复出现时使用 #实例名。
+- 只引用当前图鉴中存在的角色ID；其已有技能、装备、天赋由图鉴模板自动载入，不要在 <BATTLE> 中重复填写。
+- “障碍”只填写会真实影响战斗走位/攻击线的物体；没有则留空。
+- 只有剧情中存在合理撤退路线时才填写“撤离”；没有则留空。
+- 场景尺寸默认9；只有空间明显更小/更大时才调整。
+- <BATTLE> 必须是整条回复最后的内容，之后不要再写任何小说正文。
+- 战斗开始后，小游戏决定事实；战斗结束后会把不可修改的事实重新交给你续写。
+
+【关键原则】
+你负责把故事写到“剑将出鞘”；小游戏负责决定“这一剑之后发生什么”。`;
 }
 
 async function refreshProtocolPrompt(){
@@ -614,7 +797,7 @@ async function openOverlay({mode='battle',triggerItem=null}={}){
   overlay.hidden=false;
   document.body.classList.add('tb-overlay-open');
 
-  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.16`;
+  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.18`;
   overlayFrame.src=url;
 
   pendingFrameSetup={mode,triggerItem};
@@ -870,7 +1053,7 @@ async function init(){
     }
   });
 
-  console.log('[TavernBattle] v0.17 initialized');
+  console.log('[TavernBattle] v0.18 initialized');
 }
 
 export async function onActivate(){
