@@ -27,6 +27,12 @@
     aiIncludeStory:true,
     aiIncludeWorldInfo:true,
     aiExtraRequirements:'',
+    batchKind:null,
+    batchCount:5,
+    batchResult:null,
+    batchHints:null,
+    bundleResult:null,
+    bundleTeam:'enemy',
     lang:'zh'
   };
 
@@ -457,7 +463,9 @@
       status:renderStatus,
       talent:renderTalent,
       trigger:renderTrigger,
-      ai:renderAI
+      ai:renderAI,
+      batch_ai:renderBatchAI,
+      bundle_ai:renderBundleAI
     })[E.tab](body);
   }
 
@@ -658,6 +666,8 @@
             <button id="newActorBtn">新建角色</button>
             <button id="deleteActorBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button>
             <button id="actorAINewBtn" class="secondary">✨ AI新建角色</button>
+            <button id="actorAIBatchBtn" class="secondary">✨ AI批量新建角色</button>
+            <button id="actorBundleBtn" class="secondary">🧙 AI生成角色整套</button>
             <button id="actorAIModifyBtn" class="secondary">🪄 AI修改当前</button>
           </div>
         </div>
@@ -687,6 +697,8 @@
         api.updateLibrary(kind,json.id,json,true); E.selectedId=json.id; E.tab='codex'; render();
       },false,{mode:'create',returnTab:'codex',hints:{team:kind}});
     });
+    body.querySelector('#actorAIBatchBtn').addEventListener('click',()=>openBatchAI('actor',{team:kind}));
+    body.querySelector('#actorBundleBtn').addEventListener('click',()=>openBundleAI(kind));
     body.querySelector('#actorAIModifyBtn').addEventListener('click',()=>{
       const current=readActorForm(body,kind);
       openAI('actor',current,actorSchema(),json=>{
@@ -1015,6 +1027,7 @@
             <button id="newLibBtn">新建</button>
             <button id="deleteLibBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button>
             <button id="libAINewBtn" class="secondary">✨ AI新建</button>
+            <button id="libAIBatchBtn" class="secondary">✨ AI批量新建</button>
             <button id="libAIModifyBtn" class="secondary">🪄 AI修改当前</button>
           </div>
         </div>
@@ -1041,6 +1054,7 @@
         api.updateLibrary(kind,json.id,json,true);E.selectedId=json.id;E.tab=kind;render();
       },false,{mode:'create',returnTab:kind});
     });
+    body.querySelector('#libAIBatchBtn').addEventListener('click',()=>openBatchAI(kind));
     body.querySelector('#libAIModifyBtn').addEventListener('click',()=>{
       const data=kind==='skill'?readSkillForm(body):readEquipForm(body);
       openAI(kind,data,kind==='skill'?skillSchema():equipSchema(),json=>{
@@ -1104,7 +1118,7 @@
     body.innerHTML=`<div class="editor-grid">
       <div class="editor-panel"><h3>Buff / Debuff 状态库</h3>
         <div class="editor-list">${ids.map(id=>`<button class="editor-chip ${id===E.selectedId?'active':''}" data-id="${esc(id)}">${esc(b[id].name||id)}</button>`).join('')}</div>
-        <div class="editor-actions"><button id="newStatusBtn">新建状态</button><button id="deleteStatusBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button><button id="statusAINewBtn" class="secondary">✨ AI新建</button><button id="statusAIModifyBtn" class="secondary">🪄 AI修改当前</button></div>
+        <div class="editor-actions"><button id="newStatusBtn">新建状态</button><button id="deleteStatusBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button><button id="statusAINewBtn" class="secondary">✨ AI新建</button><button id="statusAIBatchBtn" class="secondary">✨ AI批量新建</button><button id="statusAIModifyBtn" class="secondary">🪄 AI修改当前</button></div>
         <p class="editor-warning">状态可被技能、装备、天赋的通用 Effect 使用 <code>apply_status</code> 施加。状态自身也能带规则，例如“行动结束时流血掉血”。</p>
       </div>
       <div class="editor-panel"><h3>状态数据</h3><div class="form-grid">
@@ -1141,6 +1155,7 @@
     body.querySelector('#statusAINewBtn').addEventListener('click',()=>{
       openAI('status',null,statusSchema(),json=>{api.updateLibrary('status',json.id,json,true);E.selectedId=json.id;E.tab='status';render();},false,{mode:'create',returnTab:'status'});
     });
+    body.querySelector('#statusAIBatchBtn').addEventListener('click',()=>openBatchAI('status'));
     body.querySelector('#statusAIModifyBtn').addEventListener('click',()=>{
       openAI('status',readStatus(body),statusSchema(),json=>{api.updateLibrary('status',json.id,json,true);E.selectedId=json.id;E.tab='status';render();},false,{mode:'modify',returnTab:'status'});
     });
@@ -1175,6 +1190,7 @@
             <button id="newTalentBtn">新建天赋</button>
             <button id="deleteTalentBtn" class="secondary" ${!E.selectedId?'disabled':''}>删除</button>
             <button id="talentAINewBtn" class="secondary">✨ AI新建</button>
+            <button id="talentAIBatchBtn" class="secondary">✨ AI批量新建</button>
             <button id="talentAIModifyBtn" class="secondary">🪄 AI修改当前</button>
           </div>
           <hr>
@@ -1228,6 +1244,7 @@
     body.querySelector('#talentAINewBtn').addEventListener('click',()=>{
       openAI('talent',null,talentSchema(),json=>{api.updateLibrary('talent',json.id,json,true);E.selectedId=json.id;E.tab='talent';render();},false,{mode:'create',returnTab:'talent'});
     });
+    body.querySelector('#talentAIBatchBtn').addEventListener('click',()=>openBatchAI('talent'));
     body.querySelector('#talentAIModifyBtn').addEventListener('click',()=>{
       openAI('talent',readTalentForm(body),talentSchema(),json=>{api.updateLibrary('talent',json.id,json,true);E.selectedId=json.id;E.tab='talent';render();},false,{mode:'modify',returnTab:'talent'});
     });
@@ -1508,6 +1525,424 @@
     body.querySelector('#backAITab').addEventListener('click',()=>{
       E.tab=E.aiReturnTab||'scene';
       render();
+    });
+  }
+
+
+  // ---------- AI批量新建 ----------
+  function batchKindLabel(kind){
+    return ({actor:'角色',skill:'技能',equipment:'装备',talent:'天赋',status:'状态'})[kind]||kind;
+  }
+
+  function batchLimit(kind){
+    if(kind==='actor')return 5;
+    if(kind==='talent')return 8;
+    return 10;
+  }
+
+  function batchItemSchema(kind){
+    if(kind==='actor')return actorSchema();
+    if(kind==='skill')return skillSchema();
+    if(kind==='equipment')return equipSchema();
+    if(kind==='talent')return talentSchema();
+    if(kind==='status')return statusSchema();
+    return {};
+  }
+
+  function batchSchema(kind,count){
+    return {items:Array.from({length:Math.max(1,Number(count||1))},()=>batchItemSchema(kind))};
+  }
+
+  function openBatchAI(kind,hints={}){
+    E.batchKind=kind;
+    E.batchCount=Math.min(E.batchCount||5,batchLimit(kind));
+    E.batchResult=null;
+    E.batchHints=hints||{};
+    E.aiIncludeStory=true;
+    E.aiIncludeWorldInfo=true;
+    E.aiExtraRequirements='';
+    E.aiReturnTab=kind==='actor'?'codex':kind;
+    E.tab='batch_ai';
+    render();
+  }
+
+  function validateBatchItems(kind,items){
+    const seen=new Set(),errors=[];
+    for(const item of items||[]){
+      if(!item||typeof item!=='object'){errors.push('存在非对象条目');continue;}
+      if(!item.id){errors.push(`「${item.name||'未命名'}」缺少 id`);continue;}
+      if(seen.has(item.id))errors.push(`批次内部重复 ID：${item.id}`);
+      seen.add(item.id);
+      if(idExistsForAI(kind,item.id))errors.push(`数据库已存在 ID：${item.id}`);
+    }
+    return errors;
+  }
+
+  function renderBatchPreview(body,data){
+    const holder=body.querySelector('#batchPreview');
+    if(!holder)return;
+    const items=Array.isArray(data?.items)?data.items:[];
+    if(!items.length){
+      holder.innerHTML='<div class="picker-no-result">还没有批量生成结果。</div>';
+      return;
+    }
+    holder.innerHTML=items.map((item,i)=>`
+      <label class="batch-preview-item">
+        <input type="checkbox" data-batch-index="${i}" checked>
+        <span>
+          <b>${esc(item.name||item.id||`项目${i+1}`)}</b>
+          <small>${esc(item.id||'无ID')}</small>
+          <em>${esc(item.description||'')}</em>
+        </span>
+      </label>`).join('');
+  }
+
+  function renderBatchAI(body){
+    const kind=E.batchKind||'equipment',max=batchLimit(kind);
+    body.innerHTML=`
+      <div class="editor-grid">
+        <div class="editor-panel">
+          <h3>✨ AI批量新建 · ${batchKindLabel(kind)}</h3>
+          <p class="muted">一次生成多个独立对象。不会立即写入数据库，先预览、勾选，再统一导入。</p>
+
+          <div class="form-grid">
+            <label class="form-field">生成数量
+              <input id="batchCount" type="number" min="1" max="${max}" value="${Math.min(E.batchCount||5,max)}">
+            </label>
+          </div>
+
+          <div class="ai-context-options">
+            <label class="checkbox-label-local"><input id="batchIncludeStory" type="checkbox" ${E.aiIncludeStory?'checked':''}><span>附加最近剧情与当前角色参考</span></label>
+            <label class="checkbox-label-local"><input id="batchIncludeWorldInfo" type="checkbox" ${E.aiIncludeWorldInfo?'checked':''}><span>附加当前激活世界书</span></label>
+          </div>
+
+          <label class="form-field full ai-extra-field">
+            补充要求
+            <textarea id="batchRequirements" placeholder="例如：为洛家筑基期准备6件普通到优秀品质的装备，作用不要重复。">${esc(E.aiExtraRequirements||'')}</textarea>
+          </label>
+
+          <div class="editor-actions">
+            <button id="callBatchAI">✨ 批量生成</button>
+            <button id="backBatchAI" class="secondary">返回</button>
+          </div>
+          <div id="batchStatus" class="ai-status">尚未生成。</div>
+        </div>
+
+        <div class="editor-panel">
+          <h3>批量预览</h3>
+          <div id="batchPreview" class="batch-preview"></div>
+          <details>
+            <summary>查看 / 修改原始 JSON</summary>
+            <textarea id="batchRaw" class="trigger-box"></textarea>
+          </details>
+          <div class="editor-actions"><button id="importBatchBtn">导入勾选项</button></div>
+        </div>
+      </div>`;
+
+    renderBatchPreview(body,E.batchResult);
+    if(E.batchResult)body.querySelector('#batchRaw').value=JSON.stringify(E.batchResult,null,2);
+
+    body.querySelector('#backBatchAI').addEventListener('click',()=>{E.tab=E.aiReturnTab||'equipment';render();});
+
+    body.querySelector('#callBatchAI').addEventListener('click',async()=>{
+      const provider=window.TavernBattleAIProvider;
+      if(!provider?.generate){body.querySelector('#batchStatus').textContent='未连接酒馆 AI Provider。';return;}
+
+      const count=Math.max(1,Math.min(max,Number(body.querySelector('#batchCount').value||1)));
+      E.batchCount=count;
+      E.aiIncludeStory=body.querySelector('#batchIncludeStory').checked;
+      E.aiIncludeWorldInfo=body.querySelector('#batchIncludeWorldInfo').checked;
+      E.aiExtraRequirements=body.querySelector('#batchRequirements').value;
+
+      const teamHint=kind==='actor' && E.batchHints?.team
+        ? `本批角色阵营固定为 ${E.batchHints.team}。`
+        : '';
+
+      const prompt=`创建 ${count} 个全新的${batchKindLabel(kind)}。
+每个对象都必须拥有唯一 ID，彼此不要重复，也不能覆盖现有 ID。
+${teamHint}
+它们应作为一组具有合理多样性的候选数据，同时服从当前战斗数据库的数值生态。
+不要复制已有对象，不要为了凑数量让所有条目的属性、功能和规则高度重复。
+
+补充要求：
+${E.aiExtraRequirements||'（无）'}
+
+只返回一个 JSON：
+{"items":[...]}
+items 必须恰好包含 ${count} 个完整对象。`;
+
+      const btn=body.querySelector('#callBatchAI');
+      btn.disabled=true;
+      body.querySelector('#batchStatus').textContent='正在批量生成……';
+      try{
+        const result=await provider.generate({
+          kind,
+          operation:'batch_create',
+          prompt,
+          schema:batchSchema(kind,count),
+          current:null,
+          hints:E.batchHints||{},
+          includeStory:E.aiIncludeStory,
+          includeWorldInfo:E.aiIncludeWorldInfo,
+          extraRequirements:E.aiExtraRequirements,
+          plainText:false,
+          count
+        });
+        const items=Array.isArray(result?.items)?result.items:[];
+        if(kind==='actor' && E.batchHints?.team)items.forEach(x=>x.team=E.batchHints.team);
+        E.batchResult={items};
+        const errors=validateBatchItems(kind,items);
+        renderBatchPreview(body,E.batchResult);
+        body.querySelector('#batchRaw').value=JSON.stringify(E.batchResult,null,2);
+        body.querySelector('#batchStatus').textContent=errors.length
+          ? `已生成，但检测到：${errors.join('；')}`
+          : `已生成 ${items.length} 个${batchKindLabel(kind)}，请检查后导入。`;
+      }catch(err){
+        body.querySelector('#batchStatus').textContent=`批量生成失败：${err.message}`;
+      }finally{btn.disabled=false;}
+    });
+
+    body.querySelector('#importBatchBtn').addEventListener('click',()=>{
+      try{
+        const parsed=JSON.parse(body.querySelector('#batchRaw').value.trim());
+        const all=Array.isArray(parsed?.items)?parsed.items:[];
+        const selected=[...body.querySelectorAll('[data-batch-index]:checked')]
+          .map(x=>all[Number(x.dataset.batchIndex)]).filter(Boolean);
+        if(!selected.length)throw new Error('没有勾选任何项目');
+        if(kind==='actor' && E.batchHints?.team)selected.forEach(x=>x.team=E.batchHints.team);
+        const errors=validateBatchItems(kind,selected);
+        if(errors.length)throw new Error(errors.join('；'));
+
+        for(const item of selected){
+          if(kind==='actor'){
+            const team=E.batchHints?.team||item.team||'enemy';
+            item.team=team;
+            api.updateLibrary(team,item.id,item,false);
+          }else{
+            api.updateLibrary(kind,item.id,item,false);
+          }
+        }
+        api.restart();
+        alert(`已导入 ${selected.length} 个${batchKindLabel(kind)}。`);
+        E.batchResult=null;E.tab=E.aiReturnTab||kind;render();
+      }catch(err){alert(`批量导入失败：${err.message}`);}
+    });
+  }
+
+  // ---------- AI角色整套 ----------
+  function openBundleAI(team='enemy'){
+    E.bundleTeam=team||'enemy';
+    E.bundleResult=null;
+    E.aiIncludeStory=true;
+    E.aiIncludeWorldInfo=true;
+    E.aiExtraRequirements='';
+    E.aiReturnTab='codex';
+    E.tab='bundle_ai';
+    render();
+  }
+
+  function bundleSchema(){
+    return {
+      actor:actorSchema(),
+      skills:[skillSchema()],
+      equipment:[equipSchema()],
+      talents:[talentSchema()],
+      statuses:[statusSchema()]
+    };
+  }
+
+  function bundleAllIds(bundle){
+    const c=collection();
+    const sets={
+      skill:new Set(Object.keys(c.skills||{})),
+      equipment:new Set(Object.keys(c.equipment||{})),
+      talent:new Set(Object.keys(c.talents||{})),
+      status:new Set(Object.keys(c.statuses||{}))
+    };
+    for(const x of bundle?.skills||[])if(x?.id)sets.skill.add(x.id);
+    for(const x of bundle?.equipment||[])if(x?.id)sets.equipment.add(x.id);
+    for(const x of bundle?.talents||[])if(x?.id)sets.talent.add(x.id);
+    for(const x of bundle?.statuses||[])if(x?.id)sets.status.add(x.id);
+    return sets;
+  }
+
+  function validateBundle(bundle){
+    const errors=[];
+    if(!bundle?.actor?.id)errors.push('角色缺少 id');
+    if(bundle?.actor?.id && idExistsForAI('actor',bundle.actor.id))errors.push(`角色 ID 已存在：${bundle.actor.id}`);
+
+    for(const [kind,key] of [['skill','skills'],['equipment','equipment'],['talent','talents'],['status','statuses']]){
+      const seen=new Set();
+      for(const item of bundle?.[key]||[]){
+        if(!item?.id){errors.push(`${kind} 中有条目缺少 id`);continue;}
+        if(seen.has(item.id))errors.push(`${kind} 批次内部重复 ID：${item.id}`);
+        seen.add(item.id);
+        if(idExistsForAI(kind,item.id))errors.push(`${kind} ID 已存在：${item.id}`);
+      }
+    }
+
+    const ids=bundleAllIds(bundle);
+    for(const id of bundle?.actor?.skills||[])if(!ids.skill.has(id))errors.push(`角色引用不存在技能：${id}`);
+    for(const id of bundle?.actor?.equipment||[])if(!ids.equipment.has(id))errors.push(`角色引用不存在装备：${id}`);
+    for(const id of bundle?.actor?.talents||[])if(!ids.talent.has(id))errors.push(`角色引用不存在天赋：${id}`);
+    return errors;
+  }
+
+  function renderBundlePreview(body,bundle){
+    const holder=body.querySelector('#bundlePreview');
+    if(!holder)return;
+    if(!bundle?.actor){holder.innerHTML='<div class="picker-no-result">还没有生成角色整套。</div>';return;}
+
+    const sections=[
+      ['角色',[bundle.actor]],
+      ['技能',bundle.skills||[]],
+      ['装备',bundle.equipment||[]],
+      ['天赋',bundle.talents||[]],
+      ['状态',bundle.statuses||[]]
+    ];
+
+    holder.innerHTML=sections.map(([label,items])=>`
+      <section class="bundle-section">
+        <h4>${label} · ${items.length}</h4>
+        ${items.length?items.map(item=>`
+          <div class="bundle-item">
+            <b>${esc(item.name||item.id)}</b>
+            <small>${esc(item.id||'无ID')}</small>
+            ${item.description?`<em>${esc(item.description)}</em>`:''}
+          </div>`).join(''):'<div class="muted">无</div>'}
+      </section>`).join('');
+  }
+
+  function renderBundleAI(body){
+    body.innerHTML=`
+      <div class="editor-grid">
+        <div class="editor-panel">
+          <h3>🧙 AI生成角色整套</h3>
+          <p class="muted">一次生成角色及其配套技能、装备、天赋和必要状态，并自动检查引用是否闭合。</p>
+
+          <div class="ai-context-options">
+            <label class="checkbox-label-local"><input id="bundleIncludeStory" type="checkbox" ${E.aiIncludeStory?'checked':''}><span>附加最近剧情与当前角色参考</span></label>
+            <label class="checkbox-label-local"><input id="bundleIncludeWorldInfo" type="checkbox" ${E.aiIncludeWorldInfo?'checked':''}><span>附加当前激活世界书</span></label>
+          </div>
+
+          <label class="form-field full ai-extra-field">
+            角色整套要求
+            <textarea id="bundleRequirements" placeholder="例如：洛家筑基后期执法堂长老，水属性剑修，偏控制和防守。技能5个、装备3件、天赋2个；只有必要时才创建新状态。">${esc(E.aiExtraRequirements||'')}</textarea>
+          </label>
+
+          <div class="bundle-defaults">默认建议：技能 5 个｜装备 3 件｜天赋 2 个｜状态 0~2 个</div>
+
+          <div class="editor-actions">
+            <button id="callBundleAI">🧙 生成角色整套</button>
+            <button id="backBundleAI" class="secondary">返回</button>
+          </div>
+          <div id="bundleStatus" class="ai-status">尚未生成。</div>
+        </div>
+
+        <div class="editor-panel">
+          <h3>整套预览</h3>
+          <div id="bundlePreview" class="bundle-preview"></div>
+          <details>
+            <summary>查看 / 修改原始 JSON</summary>
+            <textarea id="bundleRaw" class="trigger-box"></textarea>
+          </details>
+          <div class="editor-actions"><button id="importBundleBtn">导入整套数据</button></div>
+        </div>
+      </div>`;
+
+    renderBundlePreview(body,E.bundleResult);
+    if(E.bundleResult)body.querySelector('#bundleRaw').value=JSON.stringify(E.bundleResult,null,2);
+
+    body.querySelector('#backBundleAI').addEventListener('click',()=>{E.tab='codex';render();});
+
+    body.querySelector('#callBundleAI').addEventListener('click',async()=>{
+      const provider=window.TavernBattleAIProvider;
+      if(!provider?.generate){body.querySelector('#bundleStatus').textContent='未连接酒馆 AI Provider。';return;}
+
+      E.aiIncludeStory=body.querySelector('#bundleIncludeStory').checked;
+      E.aiIncludeWorldInfo=body.querySelector('#bundleIncludeWorldInfo').checked;
+      E.aiExtraRequirements=body.querySelector('#bundleRequirements').value;
+
+      const prompt=`创建一个完整的新战斗角色套装。
+
+建议组成：
+- 角色 1 个；
+- 技能约 5 个，通常不超过 8 个；
+- 装备约 3 件；
+- 天赋约 2 个；
+- 状态仅在技能/天赋确实需要独立状态ID时创建，通常 0~2 个。
+
+硬性要求：
+1. 先规划本整套所有新 ID，确保唯一且互相引用闭合。
+2. actor.skills 只能引用已有技能 ID 或本次 skills 中生成的 ID。
+3. actor.equipment 只能引用已有装备 ID 或本次 equipment 中生成的 ID。
+4. actor.talents 只能引用已有天赋 ID 或本次 talents 中生成的 ID。
+5. 技能/天赋需要状态时优先复用已有状态，只有确实不适合才创建 statuses。
+6. 整套强度必须参考当前角色、技能、装备数值标尺。
+7. 不要为了凑数量生成大量功能重复的对象。
+8. 新角色阵营固定为 ${E.bundleTeam}。
+
+补充要求：
+${E.aiExtraRequirements||'（无）'}
+
+只返回：
+{
+  "actor": {...},
+  "skills": [...],
+  "equipment": [...],
+  "talents": [...],
+  "statuses": [...]
+}`;
+
+      const btn=body.querySelector('#callBundleAI');
+      btn.disabled=true;
+      body.querySelector('#bundleStatus').textContent='正在生成整套角色数据……';
+      try{
+        const result=await provider.generate({
+          kind:'actor_bundle',
+          operation:'bundle_create',
+          prompt,
+          schema:bundleSchema(),
+          current:null,
+          hints:{team:E.bundleTeam},
+          includeStory:E.aiIncludeStory,
+          includeWorldInfo:E.aiIncludeWorldInfo,
+          extraRequirements:E.aiExtraRequirements,
+          plainText:false
+        });
+        if(result?.actor)result.actor.team=E.bundleTeam;
+        E.bundleResult=result;
+        const errors=validateBundle(result);
+        renderBundlePreview(body,result);
+        body.querySelector('#bundleRaw').value=JSON.stringify(result,null,2);
+        body.querySelector('#bundleStatus').textContent=errors.length
+          ? `已生成，但检测到：${errors.join('；')}`
+          : `整套生成完成：技能 ${(result.skills||[]).length} / 装备 ${(result.equipment||[]).length} / 天赋 ${(result.talents||[]).length} / 状态 ${(result.statuses||[]).length}`;
+      }catch(err){
+        body.querySelector('#bundleStatus').textContent=`整套生成失败：${err.message}`;
+      }finally{btn.disabled=false;}
+    });
+
+    body.querySelector('#importBundleBtn').addEventListener('click',()=>{
+      try{
+        const bundle=JSON.parse(body.querySelector('#bundleRaw').value.trim());
+        if(bundle?.actor)bundle.actor.team=E.bundleTeam;
+        const errors=validateBundle(bundle);
+        if(errors.length)throw new Error(errors.join('；'));
+
+        for(const x of bundle.statuses||[])api.updateLibrary('status',x.id,x,false);
+        for(const x of bundle.skills||[])api.updateLibrary('skill',x.id,x,false);
+        for(const x of bundle.equipment||[])api.updateLibrary('equipment',x.id,x,false);
+        for(const x of bundle.talents||[])api.updateLibrary('talent',x.id,x,false);
+        api.updateLibrary(E.bundleTeam,bundle.actor.id,bundle.actor,false);
+        api.restart();
+
+        alert(`已导入角色「${bundle.actor.name||bundle.actor.id}」及整套配套数据。`);
+        E.selectedId=bundle.actor.id;
+        E.bundleResult=null;
+        E.tab='codex';
+        render();
+      }catch(err){alert(`整套导入失败：${err.message}`);}
     });
   }
 

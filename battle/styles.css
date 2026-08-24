@@ -892,3 +892,16 @@ body.tb-embed-editor .editor-root {
   margin-top:8px;
   min-height:280px;
 }
+
+
+/* v0.20：批量AI / 角色整套 */
+.batch-preview,.bundle-preview{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.batch-preview-item{display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border:1px solid #394550;border-radius:9px;background:#171d22;cursor:pointer}
+.batch-preview-item input{margin-top:4px}
+.batch-preview-item span,.bundle-item{display:flex;flex-direction:column;min-width:0}
+.batch-preview-item small,.bundle-item small{color:#9db6cc;font-size:10px;margin-top:2px}
+.batch-preview-item em,.bundle-item em{color:var(--muted);font-size:11px;font-style:normal;margin-top:4px}
+.bundle-section{padding:9px;border:1px solid #36414b;border-radius:9px;background:#12171c}
+.bundle-section h4{margin:0 0 7px}
+.bundle-item{padding:6px 7px;border-radius:7px;background:#1a2026;margin-top:5px}
+.bundle-defaults{margin-top:8px;padding:8px 10px;border-left:3px solid #6b815e;background:#151b16;color:var(--muted);font-size:11px}

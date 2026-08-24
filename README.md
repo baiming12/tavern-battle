@@ -1,4 +1,4 @@
-# 酒馆战斗 · SillyTavern 扩展 v0.19
+# 酒馆战斗 · SillyTavern 扩展 v0.21
 
 这是把独立战斗 Demo v0.14 接入 SillyTavern 的第一版闭环。
 
@@ -155,3 +155,47 @@ v0.19 使用三层保障：
 
 内部数据 AI (`generateRaw`) 与战斗后小说续写 (`generateQuietPrompt`) 会通过
 `internalGenerationDepth` 排除战斗触发协议，避免数据生成或结算续写误触发新的 `<BATTLE>`。
+
+
+## v0.21：以 v0.19 为基线合入批量生成
+
+本版本明确以 v0.19 为基线，因此完整保留：
+
+- 初始化 `setExtensionPrompt` 注册；
+- `GENERATION_AFTER_COMMANDS` 每次剧情生成前重新注册；
+- `CHAT_COMPLETION_PROMPT_READY` 检查；
+- `CHAT_COMPLETION_SETTINGS_READY` 最终 outgoing messages 检查与 system-message 兜底；
+- 协议注入状态显示；
+- “重新注入战斗协议”按钮；
+- 数据 AI / 战后内部续写不会误注入新的战斗触发协议。
+
+在此基础上合入批量数据功能：
+
+### ✨ AI批量新建
+支持：
+- 角色 1~5
+- 技能 1~10
+- 装备 1~10
+- 天赋 1~8
+- 状态 1~10
+
+流程：AI返回 → 预览 → 勾选 → ID冲突检查 → 批量导入。
+
+### 🧙 AI生成角色整套
+一次生成：
+- actor × 1
+- skills × 若干
+- equipment × 若干
+- talents × 若干
+- statuses × 必要时生成
+
+生成时会附加角色 / 技能 / 装备 / 天赋 / 状态的现有数值与规则参照，
+并要求先规划 ID、保证引用闭合。
+
+导入前检查：
+- 新 ID 与现有数据库冲突；
+- 批次内部重复；
+- actor.skills / equipment / talents 是否引用到已有对象或本次新对象。
+
+导入顺序：
+状态 → 技能 → 装备 → 天赋 → 角色。

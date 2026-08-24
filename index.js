@@ -251,6 +251,13 @@ function taskReferenceContext(kind,collection){
   if(kind==='equipment') return equipmentReferenceContext(collection);
   if(kind==='skill') return [skillReferenceContext(collection),statusReferenceContext(collection)].join('\n\n');
   if(kind==='actor') return [actorReferenceContext(collection),equipmentReferenceContext(collection),skillReferenceContext(collection)].join('\n\n');
+  if(kind==='actor_bundle') return [
+    actorReferenceContext(collection),
+    skillReferenceContext(collection),
+    equipmentReferenceContext(collection),
+    talentReferenceContext(collection),
+    statusReferenceContext(collection)
+  ].join('\n\n');
   if(kind==='status') return statusReferenceContext(collection);
   if(kind==='talent') return [talentReferenceContext(collection),statusReferenceContext(collection)].join('\n\n');
   if(kind==='scene'||kind==='battle_trigger') return actorLoadoutText(collection);
@@ -829,7 +836,7 @@ async function aiProviderGenerate({
   plainText=false
 }){
   const c=ctx();
-  const actionLabel=operation==='create'?'新建':'修改';
+  const actionLabel=operation==='batch_create'?'批量新建':operation==='bundle_create'?'生成整套':operation==='create'?'新建':'修改';
   const loader=c.loader?.show?.({
     blocking:false,
     message:`战斗数据 AI ${actionLabel}：${kind}`,
@@ -848,6 +855,8 @@ async function aiProviderGenerate({
 - 优先复用已有技能 / 装备 / 天赋 / 状态 ID。
 - 不把中文显示名称当作 ID。
 - CREATE 模式必须创建全新对象与唯一 ID，不复制当前对象。
+- BATCH_CREATE 模式中每个条目都必须拥有唯一 ID，并按要求数量返回。
+- BUNDLE_CREATE 模式必须先规划整套新 ID，并保证角色、技能、装备、天赋、状态之间的引用闭合。
 - MODIFY 模式默认保持原 id，不丢失未要求删除的复杂规则。
 - 若要求 JSON，只输出合法 JSON，不要 Markdown 代码块，不要解释。`;
 
@@ -857,7 +866,11 @@ async function aiProviderGenerate({
 
     const operationContext=operation==='modify'
       ? `[操作语义]\nMODIFY：当前对象是修改基底。默认保持 id=${current?.id||'（未知）'}。`
-      : `[操作语义]\nCREATE：生成一个全新的 ${kind}；ID 必须与现有数据库不同。`;
+      : operation==='batch_create'
+        ? `[操作语义]\nBATCH_CREATE：一次生成多个全新 ${kind}；每个 ID 都必须唯一，并与现有数据库不同。`
+        : operation==='bundle_create'
+          ? `[操作语义]\nBUNDLE_CREATE：生成一整套互相引用闭合的角色战斗数据；所有新 ID 必须唯一。`
+          : `[操作语义]\nCREATE：生成一个全新的 ${kind}；ID 必须与现有数据库不同。`;
 
     const extra=String(extraRequirements||'').trim();
     const rawPrompt=[
@@ -968,7 +981,7 @@ async function openOverlay({mode='battle',triggerItem=null}={}){
   overlay.hidden=false;
   document.body.classList.add('tb-overlay-open');
 
-  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.19`;
+  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.21`;
   overlayFrame.src=url;
 
   pendingFrameSetup={mode,triggerItem};
@@ -1249,7 +1262,7 @@ async function init(){
     }
   });
 
-  console.log('[TavernBattle] v0.19 initialized');
+  console.log('[TavernBattle] v0.21 initialized');
 }
 
 export async function onActivate(){
