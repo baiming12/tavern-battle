@@ -50,20 +50,62 @@ function metadata(){
   return c.chatMetadata[META_KEY];
 }
 
-function actorCatalogText(collection){
+function itemName(bucket,id){
+  return bucket?.[id]?.name||id;
+}
+
+function actorLoadoutText(collection){
   const lines=[];
   for(const [label,key] of [['我方','allies'],['中立','neutrals'],['敌方','enemies']]){
     const items=Object.values(collection?.[key]||{});
-    lines.push(`${label}图鉴：${items.length?items.map(x=>`${x.name||x.id}=${x.id}`).join('；'):'（空）'}`);
+    lines.push(`${label}图鉴：`);
+    if(!items.length){ lines.push('- （空）'); continue; }
+    for(const a of items){
+      const skills=(a.skills||[]).map(id=>`${itemName(collection?.skills,id)}(${id})`).join('、')||'无';
+      const equips=(a.equipment||[]).map(id=>`${itemName(collection?.equipment,id)}(${id})`).join('、')||'无';
+      const talents=(a.talents||[]).map(id=>`${itemName(collection?.talents,id)}(${id})`).join('、')||'无';
+      lines.push(`- ${a.name||a.id} [${a.id}]｜技能=${skills}｜装备=${equips}｜天赋=${talents}`);
+    }
   }
   return lines.join('\n');
+}
+
+function simpleIndex(title,bucket){
+  const items=Object.values(bucket||{});
+  if(!items.length) return `${title}：（空）`;
+  return `${title}：\n${items.map(x=>`- ${x.name||x.id} = ${x.id}`).join('\n')}`;
+}
+
+function fullDataCatalog(collection){
+  if(!collection) return '当前没有可用合集索引。';
+  return [
+    actorLoadoutText(collection),
+    simpleIndex('技能ID',collection.skills),
+    simpleIndex('装备ID',collection.equipment),
+    simpleIndex('天赋ID',collection.talents),
+    simpleIndex('状态ID',collection.statuses),
+  ].join('\n\n');
+}
+
+function currentCollectionForAI(){
+  try{
+    const live=overlayFrame?.contentWindow?.BattleDemoAPI?.getCollection?.();
+    if(live) return live;
+  }catch{}
+  return settings().collection;
+}
+
+function dataAiContext(kind){
+  const collection=currentCollectionForAI();
+  const catalog=fullDataCatalog(collection);
+  return `[酒馆战斗数据上下文]\n当前任务类型：${kind}\n\n${catalog}\n\n引用规则：\n- 角色的 skills / equipment / talents 必须优先引用上面已经存在的 ID。\n- 技能或规则引用状态时，statusId 必须优先引用上面已有状态 ID。\n- 不要把中文名称当 ID。\n- 不要杜撰一个不存在的引用 ID；若确实需要新依赖，只生成当前被要求的对象，并在 description 中说明缺少的依赖，不要私自连带创建一整套新对象。`;
 }
 
 function protocolText(){
   const s=settings();
   const collection=s.collection;
   const catalog=collection
-    ? actorCatalogText(collection)
+    ? actorLoadoutText(collection)
     : '当前插件还未保存自定义合集；如需战斗，优先使用已知角色ID。';
 
   return `[酒馆战斗协议]
@@ -76,7 +118,7 @@ function protocolText(){
 4. 若本次没有进入战斗，不得输出 <BATTLE>。
 5. 战斗中的事实由小游戏决定，战斗结束后会把事实重新提供给你续写。
 
-当前可引用图鉴：
+当前可引用角色及其现有配置：
 ${catalog}
 
 格式：
@@ -96,7 +138,7 @@ ${catalog}
 - 坐标从1开始。
 - 朝向只用 N/E/S/W。
 - 同一种模板重复出现时可用 #实例名。
-- 只引用当前图鉴中存在的角色ID；不要在 <BATTLE> 内临时捏造完整角色属性。
+- 只引用当前图鉴中存在的角色ID；角色已有的技能、装备、天赋由图鉴模板自动载入，不要在 <BATTLE> 中重复填写。
 - 地图、障碍、初始位置应根据刚刚的剧情合理安排。
 - <BATTLE> 必须放在整条回复最后。`;
 }
@@ -305,25 +347,50 @@ function schemaFromExample(value){
 async function aiProviderGenerate({kind,prompt,schema}){
   const c=ctx();
   const loader=c.loader?.show?.({blocking:false,message:`战斗数据 AI 填写：${kind}`,toastMode:'static'});
+  const systemPrompt=`你是“酒馆战斗”的结构化数据编辑器，不是小说作者，也不是角色扮演者。
+你的唯一任务是根据用户给出的设计要求和现有战斗数据库，填写一个可以被程序直接读取的数据对象。
+
+强制规则：
+- 不续写故事，不描写动作，不与用户聊天。
+- 不模仿当前角色，不遵循当前小说写作风格去输出正文。
+- 优先复用提供的已有 ID。
+- 只输出符合要求的数据；若要求 JSON，则只输出 JSON，不要 Markdown 代码块，不要解释。`;
+
+  const rawPrompt=`${dataAiContext(kind)}\n\n[本次编辑要求]\n${prompt}`;
+
   try{
     let raw;
-    if(schema && typeof schema==='object'){
-      const jsonSchema={
-        name:`TavernBattle_${String(kind||'data').replace(/\W/g,'_')}`,
-        strict:false,
-        value:{
-          $schema:'http://json-schema.org/draft-04/schema#',
-          ...schemaFromExample(schema)
-        }
-      };
+    const jsonSchema=schema&&typeof schema==='object'?{
+      name:`TavernBattle_${String(kind||'data').replace(/\\W/g,'_')}`,
+      strict:false,
+      value:{$schema:'http://json-schema.org/draft-04/schema#',...schemaFromExample(schema)}
+    }:null;
+
+    // 数据编辑必须走 raw generation，避免把当前小说聊天、角色口吻和故事 Main Prompt 混进来。
+    if(typeof c.generateRaw==='function'){
       try{
-        raw=await c.generateQuietPrompt({quietPrompt:prompt,jsonSchema});
-        if(!raw || raw.trim()==='{}') throw new Error('structured output unavailable');
-      }catch{
-        raw=await c.generateQuietPrompt({quietPrompt:prompt});
+        raw=await c.generateRaw({
+          prompt:rawPrompt,
+          systemPrompt,
+          instructOverride:false,
+          trimNames:false,
+          responseLength:4096,
+          jsonSchema
+        });
+      }catch(err){
+        console.warn('[TavernBattle] generateRaw structured request failed, retrying raw without schema',err);
+        raw=await c.generateRaw({
+          prompt:`${rawPrompt}\n\n只输出合法 JSON。`,
+          systemPrompt,
+          instructOverride:false,
+          trimNames:false,
+          responseLength:4096
+        });
       }
     }else{
-      raw=await c.generateQuietPrompt({quietPrompt:prompt});
+      // 老版本兼容兜底。这个路径仍可能继承聊天环境，因此给出更强的隔离提示。
+      console.warn('[TavernBattle] generateRaw unavailable; falling back to generateQuietPrompt');
+      raw=await c.generateQuietPrompt({quietPrompt:`${systemPrompt}\n\n${rawPrompt}\n\n只输出合法 JSON。`,jsonSchema});
     }
 
     const text=String(raw||'').trim()
@@ -348,6 +415,8 @@ async function setupFrame(mode,triggerItem=null){
 
   if(mode==='editor'){
     api.setPaused?.(true);
+    const root=win.document.querySelector('#editorRoot');
+    if(root?.hidden) win.document.querySelector('#toggleEditorBtn')?.click();
   }else if(triggerItem){
     const scene=api.parseTrigger(triggerItem.trigger);
     api.updateScene(scene,true);
@@ -379,7 +448,7 @@ async function openOverlay({mode='battle',triggerItem=null}={}){
   overlay.hidden=false;
   document.body.classList.add('tb-overlay-open');
 
-  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.15`;
+  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.16`;
   overlayFrame.src=url;
 
   pendingFrameSetup={mode,triggerItem};
@@ -635,7 +704,7 @@ async function init(){
     }
   });
 
-  console.log('[TavernBattle] v0.15 initialized');
+  console.log('[TavernBattle] v0.16 initialized');
 }
 
 export async function onActivate(){

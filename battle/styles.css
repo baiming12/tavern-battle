@@ -740,3 +740,94 @@ body.tb-embed-editor .main-grid {
   body.tb-embedded .app-shell { padding:5px; }
   body.tb-embedded .topbar h1 { font-size:16px; }
 }
+
+
+/* v0.16 SillyTavern mobile iframe fixes */
+html:has(body.tb-embedded),
+body.tb-embedded {
+  width:100%;
+  min-width:0;
+  min-height:100%;
+}
+body.tb-embedded {
+  margin:0;
+  padding:0;
+  overflow-x:hidden;
+}
+body.tb-embedded .app-shell {
+  width:100%;
+  max-width:none;
+  margin:0;
+  padding:8px;
+}
+
+/* 编辑器嵌入酒馆时，不再先展示整套战斗棋盘。 */
+body.tb-embed-editor .topbar,
+body.tb-embed-editor .timeline-panel,
+body.tb-embed-editor .main-grid {
+  display:none !important;
+}
+body.tb-embed-editor .data-panel {
+  margin-top:0;
+}
+body.tb-embed-editor .editor-shell {
+  margin-top:8px;
+}
+body.tb-embed-editor .editor-root {
+  min-width:0;
+}
+
+@media(max-width:620px){
+  body.tb-embedded .app-shell { padding:5px; }
+  body.tb-embed-editor .data-panel,
+  body.tb-embed-editor .editor-shell {
+    padding:9px;
+    border-radius:10px;
+  }
+  body.tb-embed-editor .data-panel-head,
+  body.tb-embed-editor .editor-head {
+    flex-direction:column;
+    align-items:stretch;
+    gap:8px;
+  }
+  body.tb-embed-editor .data-actions {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+    width:100%;
+  }
+  body.tb-embed-editor .data-actions button {
+    width:100%;
+    min-width:0;
+    white-space:normal;
+  }
+  body.tb-embed-editor .editor-head-actions {
+    width:100%;
+    justify-content:space-between;
+    align-items:center;
+  }
+  body.tb-embed-editor .editor-head-actions button,
+  body.tb-embed-editor .editor-language-label select {
+    white-space:nowrap;
+  }
+  body.tb-embed-editor .editor-tabs {
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    padding-bottom:4px;
+    scrollbar-width:thin;
+  }
+  body.tb-embed-editor .editor-tab {
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  body.tb-embed-editor .editor-panel {
+    padding:8px;
+  }
+  body.tb-embed-editor .form-grid {
+    grid-template-columns:1fr;
+  }
+  body.tb-embed-editor .library-picker-dialog {
+    width:calc(100vw - 10px);
+    max-height:calc(100dvh - 10px);
+  }
+}
