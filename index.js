@@ -21,6 +21,21 @@ let activeTriggerKey=null;
 let frameReady=false;
 let pendingFrameSetup=null;
 
+// v0.19 protocol injection diagnostics / guards
+let internalGenerationDepth=0;
+let protocolGenerationAllowed=true;
+const protocolDiagnostic={
+  registered:false,
+  registeredLength:0,
+  lastGenerationType:null,
+  promptReadySeen:false,
+  finalMessagesSeen:false,
+  finalRequestConfirmed:false,
+  fallbackUsed:false,
+  fallbackStage:null,
+  lastCheckedAt:0
+};
+
 function ctx(){
   return SillyTavern.getContext();
 }
@@ -326,18 +341,170 @@ ${catalog}
 你负责把故事写到“剑将出鞘”；小游戏负责决定“这一剑之后发生什么”。`;
 }
 
+function isStoryGenerationType(type){
+  const t=String(type||'normal').toLowerCase();
+  if(['quiet','impersonate','command','extension','raw','background'].includes(t)) return false;
+  return true;
+}
+
+function protocolMarker(){
+  return '酒馆战斗协议：剧情 → 小游戏交接';
+}
+
+function updateProtocolStatusUi(){
+  const el=document.querySelector('#tb_protocol_status');
+  if(!el) return;
+
+  const c=ctx();
+  const entry=c.extensionPrompts?.[PROMPT_ID];
+  const registered=!!entry?.value;
+  const bits=[
+    registered
+      ? `已注册 ${String(entry.value).length} 字符（position=${entry.position}, depth=${entry.depth}, role=${entry.role}）`
+      : '未注册'
+  ];
+
+  if(protocolDiagnostic.finalRequestConfirmed){
+    bits.push('最近剧情请求：✅ 最终请求已确认包含协议');
+  }else if(protocolDiagnostic.finalMessagesSeen){
+    bits.push('最近剧情请求：⚠️ 最终消息已检查但未确认');
+  }else{
+    bits.push('最近剧情请求：尚未检查');
+  }
+
+  if(protocolDiagnostic.fallbackUsed){
+    bits.push(`兜底注入：已启用（${protocolDiagnostic.fallbackStage||'unknown'}）`);
+  }
+
+  el.textContent=`战斗协议：${bits.join('｜')}`;
+}
+
 async function refreshProtocolPrompt(){
   const c=ctx();
   const s=settings();
-  if(typeof c.setExtensionPrompt!=='function') return;
-  if(!s.enabled || !s.injectProtocol){
-    await c.setExtensionPrompt(PROMPT_ID,'',-1,0,false,0);
+  if(typeof c.setExtensionPrompt!=='function'){
+    protocolDiagnostic.registered=false;
+    updateProtocolStatusUi();
     return;
   }
-  await c.setExtensionPrompt(PROMPT_ID,protocolText(),1,0,false,0);
+
+  if(!s.enabled || !s.injectProtocol){
+    await c.setExtensionPrompt(PROMPT_ID,'',-1,0,false,0);
+    protocolDiagnostic.registered=false;
+    protocolDiagnostic.registeredLength=0;
+    updateProtocolStatusUi();
+    return;
+  }
+
+  const text=protocolText();
+  const filter=()=>internalGenerationDepth===0 && protocolGenerationAllowed;
+  await c.setExtensionPrompt(PROMPT_ID,text,1,0,false,0,filter);
+
+  const entry=c.extensionPrompts?.[PROMPT_ID];
+  protocolDiagnostic.registered=!!entry?.value;
+  protocolDiagnostic.registeredLength=String(entry?.value||'').length;
+  protocolDiagnostic.lastCheckedAt=Date.now();
+
   const preview=document.querySelector('#tb_protocol_preview');
-  if(preview) preview.textContent=protocolText();
+  if(preview) preview.textContent=text;
+  updateProtocolStatusUi();
 }
+
+function messageContentText(message){
+  if(!message) return '';
+  const content=message.content;
+  if(typeof content==='string') return content;
+  if(Array.isArray(content)){
+    return content.map(part=>{
+      if(typeof part==='string') return part;
+      if(part && typeof part==='object'){
+        return part.text||part.content||'';
+      }
+      return '';
+    }).join('\n');
+  }
+  return String(content||'');
+}
+
+function promptArrayHasProtocol(messages){
+  return Array.isArray(messages) && messages.some(m=>messageContentText(m).includes(protocolMarker()));
+}
+
+function insertProtocolSystemMessage(messages,stage){
+  if(!Array.isArray(messages)) return false;
+  if(promptArrayHasProtocol(messages)) return false;
+  if(!settings().enabled || !settings().injectProtocol) return false;
+  if(internalGenerationDepth>0 || !protocolGenerationAllowed) return false;
+
+  const systemMessage={
+    role:'system',
+    content:protocolText()
+  };
+
+  let lastUser=-1;
+  for(let i=messages.length-1;i>=0;i--){
+    if(messages[i]?.role==='user'){
+      lastUser=i;
+      break;
+    }
+  }
+  if(lastUser>=0) messages.splice(lastUser,0,systemMessage);
+  else messages.push(systemMessage);
+
+  protocolDiagnostic.fallbackUsed=true;
+  protocolDiagnostic.fallbackStage=stage;
+  console.warn(`[TavernBattle] Protocol was absent at ${stage}; inserted fallback system message.`);
+  return true;
+}
+
+async function handleGenerationAfterCommands(type,options,dryRun){
+  protocolDiagnostic.lastGenerationType=type;
+  protocolGenerationAllowed=!dryRun && isStoryGenerationType(type) && internalGenerationDepth===0;
+
+  if(protocolGenerationAllowed){
+    // Re-register immediately before ST builds the actual story prompt.
+    await refreshProtocolPrompt();
+  }
+}
+
+function handleChatCompletionPromptReady(eventData){
+  if(!protocolGenerationAllowed || internalGenerationDepth>0) return;
+  if(eventData?.dryRun) return;
+
+  protocolDiagnostic.promptReadySeen=true;
+  const chat=eventData?.chat;
+  if(!promptArrayHasProtocol(chat)){
+    insertProtocolSystemMessage(chat,'CHAT_COMPLETION_PROMPT_READY');
+  }
+  updateProtocolStatusUi();
+}
+
+function handleChatCompletionSettingsReady(generateData){
+  if(!protocolGenerationAllowed || internalGenerationDepth>0) return;
+
+  protocolDiagnostic.finalMessagesSeen=true;
+  const messages=generateData?.messages;
+
+  if(!promptArrayHasProtocol(messages)){
+    insertProtocolSystemMessage(messages,'CHAT_COMPLETION_SETTINGS_READY');
+  }
+
+  protocolDiagnostic.finalRequestConfirmed=promptArrayHasProtocol(messages);
+  protocolDiagnostic.lastCheckedAt=Date.now();
+  updateProtocolStatusUi();
+
+  if(protocolDiagnostic.finalRequestConfirmed){
+    console.log('[TavernBattle] ✅ Final Chat Completion request contains battle protocol.');
+  }else{
+    console.error('[TavernBattle] ❌ Final Chat Completion request is missing battle protocol.');
+  }
+}
+
+function handleGenerationFinished(){
+  protocolGenerationAllowed=true;
+}
+
+
 
 function collectionSummary(){
   const c=settings().collection;
@@ -362,6 +529,7 @@ function updateSettingsUi(){
   if(status) status.textContent=collectionSummary();
   const preview=document.querySelector('#tb_protocol_preview');
   if(preview) preview.textContent=protocolText();
+  updateProtocolStatusUi();
 }
 
 function hashText(text){
@@ -668,6 +836,7 @@ async function aiProviderGenerate({
     toastMode:'static'
   });
 
+  internalGenerationDepth++;
   const systemPrompt=`你是“酒馆战斗”的结构化数据编辑器，不是小说作者，也不是角色扮演者。
 你的唯一任务是依据提供的参考资料、现有战斗数据库和用户要求，创建或修改一个可以被程序直接读取的数据对象。
 
@@ -748,6 +917,8 @@ async function aiProviderGenerate({
       throw new Error(`模型没有返回合法 JSON。原始输出：${text.slice(0,300)}`);
     }
   }finally{
+    internalGenerationDepth=Math.max(0,internalGenerationDepth-1);
+    protocolGenerationAllowed=true;
     await loader?.hide?.();
   }
 }
@@ -797,7 +968,7 @@ async function openOverlay({mode='battle',triggerItem=null}={}){
   overlay.hidden=false;
   document.body.classList.add('tb-overlay-open');
 
-  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.18`;
+  const url=`/scripts/extensions/${EXTENSION_FOLDER}/battle/index.html?mode=${encodeURIComponent(mode)}&v=0.19`;
   overlayFrame.src=url;
 
   pendingFrameSetup={mode,triggerItem};
@@ -868,6 +1039,7 @@ async function narrateBattle(item){
   });
   updateOverlayStatus('正在让当前酒馆模型把战斗事实写回剧情……',true);
 
+  internalGenerationDepth++;
   try{
     const text=await c.generateQuietPrompt({quietPrompt:narrativePrompt(item)});
     await addNarrativeMessage(text,item);
@@ -884,6 +1056,8 @@ async function narrateBattle(item){
     updateOverlayStatus('自动续写失败，可以点击“生成战斗叙事”重试。',true);
     if(overlay) overlay.querySelector('#tb_generate_narrative').hidden=false;
   }finally{
+    internalGenerationDepth=Math.max(0,internalGenerationDepth-1);
+    protocolGenerationAllowed=true;
     await loader?.hide?.();
   }
 }
@@ -999,6 +1173,17 @@ function bindSettingsUi(){
 
   document.querySelector('#tb_open_editor')?.addEventListener('click',()=>openOverlay({mode:'editor'}));
   document.querySelector('#tb_test_battle')?.addEventListener('click',()=>openOverlay({mode:'battle'}));
+  document.querySelector('#tb_reinject_protocol')?.addEventListener('click',async()=>{
+    protocolGenerationAllowed=true;
+    await refreshProtocolPrompt();
+    const entry=ctx().extensionPrompts?.[PROMPT_ID];
+    if(entry?.value){
+      toast('success',`战斗协议已重新注册：${String(entry.value).length} 字符`);
+    }else{
+      toast('error','重新注册失败：extensionPrompts 中仍找不到战斗协议');
+    }
+    updateProtocolStatusUi();
+  });
 }
 
 async function init(){
@@ -1022,12 +1207,23 @@ async function init(){
   bindGlobalClicks();
   await refreshProtocolPrompt();
 
-  c.eventSource?.on(c.event_types.MESSAGE_RECEIVED,handleMessageReceived);
-  c.eventSource?.on(c.event_types.CHARACTER_MESSAGE_RENDERED,()=>setTimeout(decorateChat,0));
-  c.eventSource?.on(c.event_types.MESSAGE_EDITED,()=>setTimeout(()=>captureTriggers({all:true}).then(decorateChat),0));
-  c.eventSource?.on(c.event_types.MESSAGE_SWIPED,()=>setTimeout(()=>captureTriggers({all:true}).then(decorateChat),0));
-  c.eventSource?.on(c.event_types.CHAT_CHANGED,()=>setTimeout(handleAppReady,60));
-  c.eventSource?.on(c.event_types.APP_READY,handleAppReady);
+  const ev=c.eventTypes||c.event_types;
+  c.eventSource?.on(ev.MESSAGE_RECEIVED,handleMessageReceived);
+  c.eventSource?.on(ev.CHARACTER_MESSAGE_RENDERED,()=>setTimeout(decorateChat,0));
+  c.eventSource?.on(ev.MESSAGE_EDITED,()=>setTimeout(()=>captureTriggers({all:true}).then(decorateChat),0));
+  c.eventSource?.on(ev.MESSAGE_SWIPED,()=>setTimeout(()=>captureTriggers({all:true}).then(decorateChat),0));
+  c.eventSource?.on(ev.CHAT_CHANGED,()=>setTimeout(handleAppReady,60));
+  c.eventSource?.on(ev.APP_READY,handleAppReady);
+
+  // Re-register immediately before each normal story generation.
+  c.eventSource?.on(ev.GENERATION_AFTER_COMMANDS,handleGenerationAfterCommands);
+
+  // Chat Completion safety net: inspect the actual outgoing message arrays.
+  c.eventSource?.on(ev.CHAT_COMPLETION_PROMPT_READY,handleChatCompletionPromptReady);
+  c.eventSource?.on(ev.CHAT_COMPLETION_SETTINGS_READY,handleChatCompletionSettingsReady);
+
+  c.eventSource?.on(ev.GENERATION_ENDED,handleGenerationFinished);
+  c.eventSource?.on(ev.GENERATION_STOPPED,handleGenerationFinished);
 
   window.addEventListener('message',async event=>{
     if(event.origin!==window.location.origin) return;
@@ -1053,7 +1249,7 @@ async function init(){
     }
   });
 
-  console.log('[TavernBattle] v0.18 initialized');
+  console.log('[TavernBattle] v0.19 initialized');
 }
 
 export async function onActivate(){

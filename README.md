@@ -1,4 +1,4 @@
-# 酒馆战斗 · SillyTavern 扩展 v0.18
+# 酒馆战斗 · SillyTavern 扩展 v0.19
 
 这是把独立战斗 Demo v0.14 接入 SillyTavern 的第一版闭环。
 
@@ -131,3 +131,27 @@ AI 数据生成现在按任务类型附加同类强度参考：
 - 最后输出隐藏 `<BATTLE>` 初始场景；
 - BATTLE 包含地图尺寸、双方位置/朝向、障碍、撤离点和目标；
 - 点击“进入战斗”后由插件自动解析并导入，无需手工复制。
+
+
+## v0.19：修复剧情战斗协议未进入真实请求
+
+v0.18 只在扩展初始化 / 设置变化时调用 `setExtensionPrompt()`。
+在部分 SillyTavern Chat Completion + 自定义预设组合中，用户实际请求日志里可能完全看不到战斗协议。
+
+v0.19 使用三层保障：
+
+1. 初始化时注册 `setExtensionPrompt`；
+2. 每次 `GENERATION_AFTER_COMMANDS`（真实提示词构建前）重新注册；
+3. Chat Completion 在 `CHAT_COMPLETION_PROMPT_READY` 和
+   `CHAT_COMPLETION_SETTINGS_READY` 检查实际 outgoing message array。
+   若最终数组仍缺少协议，则插入一条 system message 作为兜底。
+
+设置页新增“战斗协议状态”，会显示：
+- extensionPrompts 是否已经注册；
+- 最近一次剧情请求的最终 messages 是否确认包含协议；
+- 是否触发过兜底注入。
+
+新增“重新注入战斗协议”按钮。
+
+内部数据 AI (`generateRaw`) 与战斗后小说续写 (`generateQuietPrompt`) 会通过
+`internalGenerationDepth` 排除战斗触发协议，避免数据生成或结算续写误触发新的 `<BATTLE>`。
